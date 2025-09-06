@@ -110,21 +110,9 @@ As seguintes DLLs devem estar na pasta `Win64/`:
 └── BaseSIC.ini               # Configuração (criar manualmente)
 ```
 
-## Contribuição
-
-1. Faça fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Crie um Pull Request
-
 ## Licença
 
 Este projeto é proprietário e destinado ao uso interno da organização.
-
-## Suporte
-
-Para questões técnicas ou problemas, entre em contato com a equipe de desenvolvimento.
 
 ---
 
