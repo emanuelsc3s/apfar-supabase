@@ -1,0 +1,13 @@
+[Protheus]
+DriverID=MSSQL
+Database=TOTVS_PRODUCAO
+Username=sa
+Password=SUA_SENHA_AQUI
+Server=127.0.0.1
+Network=TCPIP
+Address=127.0.0.1
+OSAuthent=False
+MARS=Yes
+Workstation=SEU_HOSTNAME_AQUI
+ApplicationName=apfar-supabase
+VendorLib=sqlncli11.dll

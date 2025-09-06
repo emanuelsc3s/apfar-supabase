@@ -39,14 +39,167 @@ implementation
 {$R *.dfm}
 
 procedure TForm1.btn_ImportarClick(Sender: TObject);
-begin
-  with qSupabase do
+const
+  SQL_UPSERT =
+    'INSERT INTO public.tbreceber (' +
+    '  e1_recno, titulo, prefixo, tipo, saldo, valor, valor_pago,' +
+    '  vencimento, emissao, data_baixa,' +
+    '  cliente, cidade, uf, erp_cliente, obs, endereco, cep, cnpj, telefone,' +
+    '  valor_mcompra, data_pcompra, data_ultimacompra, valor_limitecredito,' +
+    '  bairro, maior_atraso, valor_desconto, valor_liquidado, cliente_ddd,' +
+    '  cliente_pessoa, cliente_tipo, empenho, processo, updated_at' +
+    ') VALUES (' +
+    '  :e1_recno, :titulo, :prefixo, :tipo, :saldo, :valor, :valor_pago,' +
+    '  :vencimento, :emissao, :data_baixa,' +
+    '  :cliente, :cidade, :uf, :erp_cliente, :obs, :endereco, :cep, :cnpj, :telefone,' +
+    '  :valor_mcompra, :data_pcompra, :data_ultimacompra, :valor_limitecredito,' +
+    '  :bairro, :maior_atraso, :valor_desconto, :valor_liquidado, :cliente_ddd,' +
+    '  :cliente_pessoa, :cliente_tipo, :empenho, :processo,' +
+    '  (now() at time zone ''America/Sao_Paulo'')' +
+    ') ON CONFLICT (e1_recno) DO UPDATE SET ' +
+    '  titulo=EXCLUDED.titulo, prefixo=EXCLUDED.prefixo, tipo=EXCLUDED.tipo,' +
+    '  saldo=EXCLUDED.saldo, valor=EXCLUDED.valor, valor_pago=EXCLUDED.valor_pago,' +
+    '  vencimento=EXCLUDED.vencimento, emissao=EXCLUDED.emissao, data_baixa=EXCLUDED.data_baixa,' +
+    '  cliente=EXCLUDED.cliente, cidade=EXCLUDED.cidade, uf=EXCLUDED.uf,' +
+    '  erp_cliente=EXCLUDED.erp_cliente, obs=EXCLUDED.obs, endereco=EXCLUDED.endereco,' +
+    '  cep=EXCLUDED.cep, cnpj=EXCLUDED.cnpj, telefone=EXCLUDED.telefone,' +
+    '  valor_mcompra=EXCLUDED.valor_mcompra, data_pcompra=EXCLUDED.data_pcompra,' +
+    '  data_ultimacompra=EXCLUDED.data_ultimacompra, valor_limitecredito=EXCLUDED.valor_limitecredito,' +
+    '  bairro=EXCLUDED.bairro, maior_atraso=EXCLUDED.maior_atraso,' +
+    '  valor_desconto=EXCLUDED.valor_desconto, valor_liquidado=EXCLUDED.valor_liquidado,' +
+    '  cliente_ddd=EXCLUDED.cliente_ddd, cliente_pessoa=EXCLUDED.cliente_pessoa,' +
+    '  cliente_tipo=EXCLUDED.cliente_tipo, empenho=EXCLUDED.empenho, processo=EXCLUDED.processo,' +
+    '  updated_at=(now() at time zone ''America/Sao_Paulo'')';
+var
+  qUp: TFDQuery;
+  fs: TFormatSettings;
+
+  procedure SetDateParam(const PName: string; F: TField);
+  var s: string; d: TDateTime;
+  begin
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
     begin
-      Close;
-      SQL.Clear;
-      SQL.Add('select * from tbreceber');
-      Open;
+      // se a sua query do SQL Server já devolver DATE, use simplesmente:
+      // qUp.ParamByName(PName).AsDate := F.AsDateTime;
+      // Senão, parse dd/MM/yyyy:
+      s := Trim(F.AsString);
+      if s = '' then qUp.ParamByName(PName).Clear
+      else if TryStrToDate(s, d, fs) then
+        qUp.ParamByName(PName).AsDate := d
+      else
+        qUp.ParamByName(PName).Clear;
     end;
+  end;
+
+begin
+  // formato para parse dd/MM/yyyy (somente se o SQL retornar texto)
+  fs := TFormatSettings.Create;
+  fs.DateSeparator   := '/';
+  fs.ShortDateFormat := 'dd/MM/yyyy';
+
+  // 1) Conecta
+  FDConnectionTOTVS.Connected := True;
+  FDConnection1.Connected     := True;
+
+  // 2) Abre o SELECT no SQL Server
+  qTOTVS.Close;
+  qTOTVS.Connection := FDConnectionTOTVS;
+  qTOTVS.SQL.Text := '/* coloque aqui o seu SELECT exatamente como enviou */ ' +
+    'SELECT ' +
+    ' SE1.R_E_C_N_O_ e1_recno,' +
+    ' SE1.E1_NUM titulo, SE1.E1_PREFIXO prefixo, SE1.E1_TIPO tipo, SE1.E1_SALDO saldo,' +
+    ' SE1.E1_VALOR valor, SE1.E1_VALOR - SE1.E1_SALDO valor_pago,' +
+    ' CASE WHEN SE1.E1_VENCREA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_VENCREA AS DATETIME),103)  END AS vencimento,' +
+    ' CASE WHEN SE1.E1_EMISSAO <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_EMISSAO AS DATETIME),103) END AS emissao,' +
+    ' CASE WHEN SE1.E1_BAIXA   <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA   AS DATETIME),103) END AS data_baixa,' +
+    ' SA1.A1_COD+''-''+RTRIM(SA1.A1_NOME) cliente,' +
+    ' RTRIM(SA1.A1_MUN) cidade, RTRIM(SA1.A1_EST) uf,' +
+    ' SE1.E1_CLIENTE erp_cliente, SE1.E1_HIST obs, SA1.A1_END endereco, SA1.A1_CEP cep,' +
+    ' SA1.A1_CGC cnpj, SA1.A1_TEL telefone, SA1.A1_MCOMPRA valor_mcompra,' +
+    ' CONVERT(VARCHAR,CAST(SA1.A1_PRICOM AS DATETIME),103) data_pcompra,' +
+    ' CONVERT(VARCHAR,CAST(SA1.A1_ULTCOM AS DATETIME),103) data_ultimacompra,' +
+    ' SA1.A1_LC valor_limitecredito, SA1.A1_BAIRRO bairro, SA1.A1_MATR maior_atraso,' +
+    ' SE1.E1_DESCONT valor_desconto, SE1.E1_VALLIQ valor_liquidado, SA1.A1_DDD cliente_ddd,' +
+    ' CASE SA1.A1_PESSOA WHEN ''F'' THEN ''Fisica'' WHEN ''J'' THEN ''Juridica'' END AS cliente_pessoa,' +
+    ' CASE SA1.A1_YTPCLI WHEN ''1'' THEN ''Publico'' WHEN ''2'' THEN ''Privado'' WHEN ''3'' THEN ''Distribuidor'' ' +
+    '      WHEN ''4'' THEN ''Farmacias e Drogarias Privadas'' WHEN ''5'' THEN ''Demais Clientes'' END AS cliente_tipo,' +
+    ' SE1.E1_XEMPENH empenho, SE1.E1_XPROCES processo ' +
+    ' FROM SE1010 (NOLOCK) SE1 ' +
+    ' LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = '''' ' +
+    ' WHERE SE1.D_E_L_E_T_ = '''' ' +
+    '   AND ((SA1.A1_YENTREG = '''') OR (SA1.A1_YENTREG = ''N'')) ' +
+    '   AND SE1.E1_VEND1 = ''000050'' ' +
+    '   AND SE1.E1_TIPO NOT IN (''NCC'',''RA'') ' +
+    '   AND SE1.E1_SUSPENS <> ''S'' ' +
+    '   AND SE1.E1_SALDO > 0 ' +
+    ' ORDER BY SA1.A1_COD, SE1.E1_VENCREA';
+  qTOTVS.Open;
+
+  // 3) Prepara o UPSERT no Supabase
+  qUp := TFDQuery.Create(nil);
+  try
+    qUp.Connection := FDConnection1;
+    qUp.SQL.Text   := SQL_UPSERT;
+    qUp.Prepare;
+
+    FDConnection1.StartTransaction;
+    try
+      qTOTVS.First;
+      while not qTOTVS.Eof do
+      begin
+        qUp.ParamByName('e1_recno').AsLargeInt         := qTOTVS.FieldByName('e1_recno').AsLargeInt;
+        qUp.ParamByName('titulo').AsString             := qTOTVS.FieldByName('titulo').AsString;
+        qUp.ParamByName('prefixo').AsString            := qTOTVS.FieldByName('prefixo').AsString;
+        qUp.ParamByName('tipo').AsString               := qTOTVS.FieldByName('tipo').AsString;
+        qUp.ParamByName('saldo').AsFloat               := qTOTVS.FieldByName('saldo').AsFloat;
+        qUp.ParamByName('valor').AsFloat               := qTOTVS.FieldByName('valor').AsFloat;
+        qUp.ParamByName('valor_pago').AsFloat          := qTOTVS.FieldByName('valor_pago').AsFloat;
+
+        SetDateParam('vencimento',        qTOTVS.FieldByName('vencimento'));
+        SetDateParam('emissao',           qTOTVS.FieldByName('emissao'));
+        SetDateParam('data_baixa',        qTOTVS.FieldByName('data_baixa'));
+        SetDateParam('data_pcompra',      qTOTVS.FieldByName('data_pcompra'));
+        SetDateParam('data_ultimacompra', qTOTVS.FieldByName('data_ultimacompra'));
+
+        qUp.ParamByName('cliente').AsString            := qTOTVS.FieldByName('cliente').AsString;
+        qUp.ParamByName('cidade').AsString             := qTOTVS.FieldByName('cidade').AsString;
+        qUp.ParamByName('uf').AsString                 := qTOTVS.FieldByName('uf').AsString;
+        qUp.ParamByName('erp_cliente').AsString        := qTOTVS.FieldByName('erp_cliente').AsString;
+        qUp.ParamByName('obs').AsString                := qTOTVS.FieldByName('obs').AsString;
+        qUp.ParamByName('endereco').AsString           := qTOTVS.FieldByName('endereco').AsString;
+        qUp.ParamByName('cep').AsString                := qTOTVS.FieldByName('cep').AsString;
+        qUp.ParamByName('cnpj').AsString               := qTOTVS.FieldByName('cnpj').AsString;
+        qUp.ParamByName('telefone').AsString           := qTOTVS.FieldByName('telefone').AsString;
+        qUp.ParamByName('valor_mcompra').AsFloat       := qTOTVS.FieldByName('valor_mcompra').AsFloat;
+        qUp.ParamByName('valor_limitecredito').AsFloat := qTOTVS.FieldByName('valor_limitecredito').AsFloat;
+        qUp.ParamByName('bairro').AsString             := qTOTVS.FieldByName('bairro').AsString;
+        qUp.ParamByName('maior_atraso').AsInteger      := qTOTVS.FieldByName('maior_atraso').AsInteger;
+        qUp.ParamByName('valor_desconto').AsFloat      := qTOTVS.FieldByName('valor_desconto').AsFloat;
+        qUp.ParamByName('valor_liquidado').AsFloat     := qTOTVS.FieldByName('valor_liquidado').AsFloat;
+        qUp.ParamByName('cliente_ddd').AsString        := qTOTVS.FieldByName('cliente_ddd').AsString;
+        qUp.ParamByName('cliente_pessoa').AsString     := qTOTVS.FieldByName('cliente_pessoa').AsString;
+        qUp.ParamByName('cliente_tipo').AsString       := qTOTVS.FieldByName('cliente_tipo').AsString;
+        qUp.ParamByName('empenho').AsString            := qTOTVS.FieldByName('empenho').AsString;
+        qUp.ParamByName('processo').AsString           := qTOTVS.FieldByName('processo').AsString;
+
+        qUp.ExecSQL;
+        qTOTVS.Next;
+      end;
+
+      FDConnection1.Commit;
+      ShowMessage('Importação concluída com sucesso.');
+    except
+      on E: Exception do
+      begin
+        FDConnection1.Rollback;
+        raise;
+      end;
+    end;
+  finally
+    qUp.Free;
+  end;
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -67,29 +220,37 @@ begin
 //  {$ELSE}
 //  FDPhysPgDriverLink1.VendorLib := ExtractFilePath(ParamStr(0)) + 'pgclient\win32\libpq.dll';
 //  {$ENDIF}
+
   FDConnection1.Params.Clear;
   FDConnection1.Params.Add('DriverID=PG');
+
   // ----- SUPABASE (MODO APP) -----
   FDConnection1.Params.Add('Server=aws-0-sa-east-1.pooler.supabase.com');
   FDConnection1.Params.Add('Port=5432'); // session pooler
   FDConnection1.Params.Add('Database=postgres');
+
   // usuário COM project-ref (ex.: postgres.dojavjvqvobnumebaouc)
   FDConnection1.Params.Add('User_Name=postgres.dojavjvqvobnumebaouc');
   FDConnection1.Params.Add('Password=aUilaqvCRLaFLOqr');
+
   // TLS obrigatório
   FDConnection1.Params.Add('SSLMode=require');
+
   // encoding
   FDConnection1.Params.Add('CharacterSet=UTF8');
+
   // extras
   FDConnection1.Params.Add('MetaDefSchema=public');
   FDConnection1.Params.Add('MetaCurSchema=public');
   FDConnection1.Params.Add('LoginTimeout=30');
   FDConnection1.LoginPrompt := False;
+
   try
     FDConnection1.Connected := True;
   except
     on E: Exception do ShowMessage('Erro: ' + E.Message);
   end;
+
   // --- SQL Server (TOTVS) ---
   // Ler todos os valores do INI primeiro
   IniFileName := ExtractFilePath(Application.ExeName) + 'BaseSIC.ini';
@@ -108,20 +269,20 @@ begin
   sMARS             := IniFile.ReadString('Protheus', 'MARS', 'No');
 
   // Driver e parâmetros básicos
-  FDConnection.Params.Clear;
-  FDConnection.DriverName := 'MSSQL';
-  FDConnection.Params.Add('Server='   + sServer);
-  FDConnection.Params.Add('Database=' + sDatabase);
+  FDConnectionTOTVS.Params.Clear;
+  FDConnectionTOTVS.DriverName := 'MSSQL';
+  FDConnectionTOTVS.Params.Add('Server='   + sServer);
+  FDConnectionTOTVS.Params.Add('Database=' + sDatabase);
 
   // Autenticação integrada ou não
-  sOSAuthent := AIniFile.ReadString('Protheus', 'OSAuthent', 'False');
+  sOSAuthent := IniFile.ReadString('Protheus', 'OSAuthent', 'False');
 
   if SameText(sOSAuthent, 'Yes') then
     OSAuthentValue := 'Yes'
   else
     OSAuthentValue := 'No';
 
-  FDConnection.Params.Add('OSAuthent=' + OSAuthentValue);
+  FDConnectionTOTVS.Params.Add('OSAuthent=' + OSAuthentValue);
 
   // Se for SQL Auth, informe usuário e senha
   if OSAuthentValue = 'No' then
