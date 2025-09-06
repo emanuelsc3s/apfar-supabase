@@ -83,33 +83,6 @@ As seguintes DLLs devem estar na pasta `Win64/`:
 - ✅ Suporte a SSL para conexões seguras
 - ✅ Sincronização de dados (em desenvolvimento)
 
-## Como Usar
-
-1. Configure o arquivo `BaseSIC.ini` com os dados do seu servidor TOTVS
-2. Execute a aplicação `ApfarSupabase.exe`
-3. A aplicação irá conectar automaticamente aos dois bancos de dados
-4. Utilize a interface para realizar as operações de importação
-
-## Desenvolvimento
-
-### Compilação
-
-- Abra o projeto no Delphi 10.4 Seattle
-- Compile usando `Ctrl+F9` ou menu Project → Build
-- O executável será gerado na pasta Win64
-
-### Estrutura do Código
-
-```
-├── ApfarSupabase.dpr          # Arquivo principal do projeto
-├── Unit_ApfarSupabase.pas     # Lógica principal da aplicação
-├── Unit_ApfarSupabase.dfm     # Interface visual
-├── Win64/                     # Bibliotecas e DLLs
-│   ├── libpq.dll             # Driver PostgreSQL
-│   └── ...                   # Outras dependências
-└── BaseSIC.ini               # Configuração (criar manualmente)
-```
-
 ## Licença
 
 Este projeto é proprietário e destinado ao uso interno da organização.
