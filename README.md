@@ -22,7 +22,7 @@ Esta aplicação fornece uma interface simples para importar e sincronizar dados
 
 1. **Conexão Supabase** (`FDConnectionSupabase`):
    - Banco de dados PostgreSQL via Supabase
-   - Servidor: `aws-0-sa-east-1.pooler.supabase.com:5432`
+   - Servidor: `postegre`
    - Banco: `postgres`
    - Utiliza pooler de sessões com SSL
 
