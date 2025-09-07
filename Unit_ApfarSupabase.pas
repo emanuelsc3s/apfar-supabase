@@ -91,6 +91,7 @@ var
   procedure SetDateParam(const PName: string; F: TField);
   var s: string; d: TDateTime;
   begin
+    qUp.ParamByName(PName).DataType := ftDate;
     if F.IsNull then
       qUp.ParamByName(PName).Clear
     else
@@ -141,7 +142,7 @@ begin
     SQL.Add(' CASE WHEN SE1.E1_VENCREA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_VENCREA AS DATETIME),103)  END AS vencimento,');
     SQL.Add(' CASE WHEN SE1.E1_EMISSAO <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_EMISSAO AS DATETIME),103) END AS emissao,');
     SQL.Add(' CASE WHEN SE1.E1_BAIXA   <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA AS DATETIME),103)   END AS data_baixa,');
-    SQL.Add(' SA1.A1_COD+''-''+RTRIM(SA1.A1_NOME) cliente,');
+    SQL.Add(' RTRIM(SA1.A1_NOME) cliente,');
     SQL.Add(' RTRIM(SA1.A1_MUN) cidade,');
     SQL.Add(' RTRIM(SA1.A1_EST) uf,');
     SQL.Add(' SE1.E1_CLIENTE erp_cliente, SE1.E1_HIST obs,');
@@ -151,7 +152,7 @@ begin
     SQL.Add(' SA1.A1_TEL telefone,');
     SQL.Add(' SA1.A1_MCOMPRA valor_mcompra,');
     SQL.Add(' CONVERT(VARCHAR,CAST(SA1.A1_PRICOM AS DATETIME),103) data_pcompra,');
-    SQL.Add(' CONVERT(VARCHAR,CAST(SA1.A1_ULTCOM AS DATETIME),103) data_ultimacompra, SA1.A1_NOME cliente,');
+    SQL.Add(' CONVERT(VARCHAR,CAST(SA1.A1_ULTCOM AS DATETIME),103) data_ultimacompra,');
     SQL.Add(' SA1.A1_LC valor_limitecredito,');
     SQL.Add(' SA1.A1_EST uf, SA1.A1_MUN cidade, SA1.A1_BAIRRO bairro, SA1.A1_MATR maior_atraso,');
     SQL.Add(' SE1.E1_DESCONT valor_desconto, SE1.E1_VALLIQ valor_liquidado, SA1.A1_DDD cliente_ddd,');
@@ -186,14 +187,14 @@ begin
     qUp.DataSource := DataSource1;
     qUp.Connection := FDConnectionSupabase;
     qUp.SQL.Text   := SQL_UPSERT;
-    qUp.Prepare;
 
     FDConnectionSupabase.StartTransaction;
     try
       qTOTVS.First;
       while not qTOTVS.Eof do
       begin
-        qUp.ParamByName('e1_recno').AsInteger          := qTOTVS.FieldByName('e1_recno').AsInteger;
+        qUp.ParamByName('e1_recno').DataType           := ftLargeint;
+        qUp.ParamByName('e1_recno').AsLargeInt          := qTOTVS.FieldByName('e1_recno').AsLargeInt;
         qUp.ParamByName('titulo').AsString             := qTOTVS.FieldByName('titulo').AsString;
         qUp.ParamByName('prefixo').AsString            := qTOTVS.FieldByName('prefixo').AsString;
         qUp.ParamByName('tipo').AsString               := qTOTVS.FieldByName('tipo').AsString;
@@ -255,15 +256,6 @@ begin
 end;
 
 procedure TForm_Principal.FormCreate(Sender: TObject);
-var
-  IniFile     : TIniFile;
-  IniFileName : string;
-
-  sServer, sDatabase, sUsername, sPassword,
-  sNetwork, sAddress, sWorkstation, sAppName, sVendorLib,
-  sOSAuthent, sMARS : string;
-
-  OSAuthentValue, MARSValue, NetworkLibValue : string;
 begin
 
  // Referencia de conexão: https://supabase.com/docs/guides/database/pgadmin
