@@ -23,11 +23,12 @@ type
     FDPhysMSSQLDriverLink: TFDPhysMSSQLDriverLink;
     qTOTVS: TFDQuery;
     DataSource1: TDataSource;
-    btn_Importar: TPanel;
+    btn_ImportarReceber: TPanel;
     btn_Fechar: TPanel;
     btn_Configurar: TPanel;
+    btn_ImportarLicitacao: TPanel;
     procedure FormCreate(Sender: TObject);
-    procedure btn_ImportarClick(Sender: TObject);
+    procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
     procedure btn_FecharClick(Sender: TObject);
   private
@@ -51,9 +52,9 @@ begin
   Application.Terminate;
 end;
 
-procedure TForm_Principal.btn_ImportarClick(Sender: TObject);
+procedure TForm_Principal.btn_ImportarReceberClick(Sender: TObject);
 const
-  FROM_JOIN_CLAUSE = 
+  FROM_JOIN_CLAUSE =
     'FROM SE1010 (NOLOCK) SE1 ' +
     'LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = '''' ';
 

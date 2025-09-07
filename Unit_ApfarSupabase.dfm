@@ -28,14 +28,14 @@ object Form_Principal: TForm_Principal
     TitleFont.Name = 'Verdana'
     TitleFont.Style = []
   end
-  object btn_Importar: TPanel
+  object btn_ImportarReceber: TPanel
     Left = 609
     Top = 303
     Width = 120
     Height = 35
     Cursor = crHandPoint
     BevelOuter = bvNone
-    Caption = 'Importar'
+    Caption = 'Imp. Receber'
     Color = 12477460
     Font.Charset = ANSI_CHARSET
     Font.Color = clWhite
@@ -45,7 +45,7 @@ object Form_Principal: TForm_Principal
     ParentBackground = False
     ParentFont = False
     TabOrder = 1
-    OnClick = btn_ImportarClick
+    OnClick = btn_ImportarReceberClick
   end
   object btn_Fechar: TPanel
     Left = 735
@@ -85,6 +85,24 @@ object Form_Principal: TForm_Principal
     TabOrder = 3
     OnClick = btn_ConfigurarClick
   end
+  object btn_ImportarLicitacao: TPanel
+    Left = 483
+    Top = 303
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Imp. Receber'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 4
+  end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (
       'Server=aws-0-sa-east-1.pooler.supabase.com'
@@ -96,36 +114,36 @@ object Form_Principal: TForm_Principal
       'Port=6543'
       'DriverID=PG')
     LoginPrompt = False
-    Left = 368
-    Top = 112
+    Left = 272
+    Top = 16
   end
   object qSupabase: TFDQuery
     Connection = FDConnectionSupabase
-    Left = 368
-    Top = 216
+    Left = 272
+    Top = 120
   end
   object FDPhysPgDriverLink: TFDPhysPgDriverLink
     VendorLib = 'C:\Program Files\PostgreSQL\17\bin\libpq.dll'
-    Left = 368
-    Top = 160
+    Left = 272
+    Top = 64
   end
   object FDConnectionTOTVS: TFDConnection
-    Left = 488
-    Top = 120
+    Left = 392
+    Top = 24
   end
   object FDPhysMSSQLDriverLink: TFDPhysMSSQLDriverLink
-    Left = 488
-    Top = 176
+    Left = 392
+    Top = 80
   end
   object qTOTVS: TFDQuery
     Connection = FDConnectionTOTVS
-    Left = 488
-    Top = 232
+    Left = 392
+    Top = 136
   end
   object DataSource1: TDataSource
     AutoEdit = False
     DataSet = qTOTVS
-    Left = 488
-    Top = 288
+    Left = 392
+    Top = 192
   end
 end
