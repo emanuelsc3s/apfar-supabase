@@ -175,16 +175,17 @@ begin
     SQL.Add(' AND SE1.E1_VEND1 = ''000050''');
     SQL.Add(' AND SE1.E1_TIPO NOT IN (''NCC'',''RA'')');
     SQL.Add(' AND SE1.E1_SUSPENS <> ''S''');
-    SQL.Add(' AND SE1.E1_SALDO > 0');
-    SQL.Add('-- AND DATEDIFF(DAY, CONVERT(DATETIME, SE1.E1_VENCREA, 112), GETDATE()) BETWEEN ''1'' AND ''99999''');
+//    SQL.Add(' AND SE1.E1_SALDO > 0');
+//    SQL.Add('-- AND DATEDIFF(DAY, CONVERT(DATETIME, SE1.E1_VENCREA, 112), GETDATE()) BETWEEN ''1'' AND ''99999''');
+
     SQL.Add(' ORDER BY SA1.A1_COD, SE1.E1_VENCREA');
+
   end;
   qTOTVS.Open;
 
   // 3) Prepara o UPSERT no Supabase
   qUp := TFDQuery.Create(nil);
   try
-    qUp.DataSource := DataSource1;
     qUp.Connection := FDConnectionSupabase;
     qUp.SQL.Text   := SQL_UPSERT;
 
