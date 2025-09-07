@@ -103,6 +103,23 @@ var
   Ini: TIniFile;
   TotalRecords, CurrentRecord: Integer;
 
+  procedure CloseActivityForm;
+  begin
+    if Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity.Close;
+      except
+        // Ignora erros de fechamento
+      end;
+      try
+        FreeAndNil(Form_Activity);
+      except
+        // Ignora erros de liberação
+      end;
+    end;
+  end;
+
   procedure SetDateParam(const PName: string; F: TField);
   var s: string; d: TDateTime;
   begin
@@ -193,17 +210,34 @@ begin
   // Exibir Form de Atividade e contar registros
   if not Assigned(Form_Activity) then
   begin
-    Application.CreateForm(TForm_Activity, Form_Activity);
-    Form_Activity.Show;
-    Form_Activity.Label_Status.Caption := 'Executando consulta...';
-    Application.ProcessMessages;
+    try
+      Form_Activity := TForm_Activity.Create(Application);
+      Form_Activity.Show;
+      Form_Activity.Label_Status.Caption := 'Executando consulta...';
+      Application.ProcessMessages;
+    except
+      on E: Exception do
+      begin
+        if Assigned(Form_Activity) then
+          FreeAndNil(Form_Activity);
+        raise Exception.Create('Erro ao criar formulário de atividade: ' + E.Message);
+      end;
+    end;
   end;
 
   TotalRecords := FDConnectionTOTVS.ExecSQLScalar(
     'SELECT COUNT(*) ' + FROM_JOIN_CLAUSE + WHERE_CLAUSE
   );
-  Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords]);
-  Application.ProcessMessages;
+  
+  if Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords]);
+      Application.ProcessMessages;
+    except
+      // Ignora erros na interface
+    end;
+  end;
   Sleep(500);
 
   // 3) Prepara o UPSERT no Supabase
@@ -219,8 +253,16 @@ begin
       while not qTOTVS.Eof do
       begin
         Inc(CurrentRecord);
-        Form_Activity.Label_Status.Caption := Format('Importando registro %d de %d...', [CurrentRecord, TotalRecords]);
-        Application.ProcessMessages;
+        
+        if Assigned(Form_Activity) then
+        begin
+          try
+            Form_Activity.Label_Status.Caption := Format('Importando registro %d de %d...', [CurrentRecord, TotalRecords]);
+            Application.ProcessMessages;
+          except
+            // Ignora erros na interface
+          end;
+        end;
 
         qUp.ParamByName('e1_recno').DataType           := ftLargeint;
         qUp.ParamByName('e1_recno').AsLargeInt         := qTOTVS.FieldByName('e1_recno').AsLargeInt;
@@ -262,7 +304,11 @@ begin
         
         if CurrentRecord mod 10 = 0 then
         begin
-          Application.ProcessMessages;
+          try
+            Application.ProcessMessages;
+          except
+            // Ignora erros no ProcessMessages
+          end;
           Sleep(10);
         end;
         
@@ -270,25 +316,13 @@ begin
       end;
 
       FDConnectionSupabase.Commit;
-      
-      if Assigned(Form_Activity) then
-      begin
-        Form_Activity.Close;
-        FreeAndNil(Form_Activity);
-      end;
-      
+      CloseActivityForm;
       ShowMessage('Importação concluída com sucesso.');
     except
       on E: Exception do
       begin
         FDConnectionSupabase.Rollback;
-        
-        if Assigned(Form_Activity) then
-        begin
-          Form_Activity.Close;
-          FreeAndNil(Form_Activity);
-        end;
-        
+        CloseActivityForm;
         raise;
       end;
     end;
