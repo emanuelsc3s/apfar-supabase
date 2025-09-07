@@ -10,21 +10,26 @@ uses
   Data.DB, FireDAC.Comp.Client, FireDAC.Phys.PG, FireDAC.Phys.PGDef,
   FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
   FireDAC.Comp.DataSet, Vcl.StdCtrls, Vcl.Grids, Vcl.DBGrids,
-  FireDAC.Phys.MSSQLDef, FireDAC.Phys.ODBCBase, FireDAC.Phys.MSSQL, System.IniFiles;
+  FireDAC.Phys.MSSQLDef, FireDAC.Phys.ODBCBase, FireDAC.Phys.MSSQL, System.IniFiles,
+  Vcl.ExtCtrls;
 
 type
   TForm_Principal = class(TForm)
-    FDConnection1: TFDConnection;
+    FDConnectionSupabase: TFDConnection;
     qSupabase: TFDQuery;
     FDPhysPgDriverLink: TFDPhysPgDriverLink;
     DBGrid1: TDBGrid;
-    btn_Importar: TButton;
     FDConnectionTOTVS: TFDConnection;
     FDPhysMSSQLDriverLink: TFDPhysMSSQLDriverLink;
     qTOTVS: TFDQuery;
     DataSource1: TDataSource;
+    btn_Importar: TPanel;
+    btn_Fechar: TPanel;
+    btn_Configurar: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarClick(Sender: TObject);
+    procedure btn_ConfigurarClick(Sender: TObject);
+    procedure btn_FecharClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -37,6 +42,14 @@ var
 implementation
 
 {$R *.dfm}
+
+uses Unit_ConfigSqlServer;
+
+
+procedure TForm_Principal.btn_FecharClick(Sender: TObject);
+begin
+  Application.Terminate;
+end;
 
 procedure TForm_Principal.btn_ImportarClick(Sender: TObject);
 const
@@ -73,6 +86,7 @@ const
 var
   qUp: TFDQuery;
   fs: TFormatSettings;
+  Ini: TIniFile;
 
   procedure SetDateParam(const PName: string; F: TField);
   var s: string; d: TDateTime;
@@ -99,9 +113,19 @@ begin
   fs.DateSeparator   := '/';
   fs.ShortDateFormat := 'dd/MM/yyyy';
 
-  // 1) Conecta
-  FDConnectionTOTVS.Connected := True;
-  FDConnection1.Connected     := True;
+  FDConnectionSupabase.Connected     := True;
+
+  if not Assigned(Form_ConfigSqlServer) then
+    Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    // Configura e conecta seu TFDConnection lá em Unit_ConfigSqlServer
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionTOTVS);
+  finally
+    Ini.Free;
+  end;
+
 
   // 2) Abre o SELECT no SQL Server
   with qTOTVS do
@@ -160,16 +184,16 @@ begin
   qUp := TFDQuery.Create(nil);
   try
     qUp.DataSource := DataSource1;
-    qUp.Connection := FDConnection1;
+    qUp.Connection := FDConnectionSupabase;
     qUp.SQL.Text   := SQL_UPSERT;
     qUp.Prepare;
 
-    FDConnection1.StartTransaction;
+    FDConnectionSupabase.StartTransaction;
     try
       qTOTVS.First;
       while not qTOTVS.Eof do
       begin
-        qUp.ParamByName('e1_recno').AsLargeInt         := qTOTVS.FieldByName('e1_recno').AsLargeInt;
+        qUp.ParamByName('e1_recno').AsInteger          := qTOTVS.FieldByName('e1_recno').AsInteger;
         qUp.ParamByName('titulo').AsString             := qTOTVS.FieldByName('titulo').AsString;
         qUp.ParamByName('prefixo').AsString            := qTOTVS.FieldByName('prefixo').AsString;
         qUp.ParamByName('tipo').AsString               := qTOTVS.FieldByName('tipo').AsString;
@@ -208,18 +232,26 @@ begin
         qTOTVS.Next;
       end;
 
-      FDConnection1.Commit;
+      FDConnectionSupabase.Commit;
       ShowMessage('Importação concluída com sucesso.');
     except
       on E: Exception do
       begin
-        FDConnection1.Rollback;
+        FDConnectionSupabase.Rollback;
         raise;
       end;
     end;
   finally
     qUp.Free;
   end;
+end;
+
+procedure TForm_Principal.btn_ConfigurarClick(Sender: TObject);
+begin
+  if not Assigned(Form_ConfigSqlServer) then
+    Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+
+  Form_ConfigSqlServer.ShowModal;
 end;
 
 procedure TForm_Principal.FormCreate(Sender: TObject);
@@ -233,6 +265,7 @@ var
 
   OSAuthentValue, MARSValue, NetworkLibValue : string;
 begin
+
  // Referencia de conexão: https://supabase.com/docs/guides/database/pgadmin
 //  libpq.dll compatível com a sua “bitness”
 //  {$IFDEF WIN64}
@@ -241,113 +274,34 @@ begin
 //  FDPhysPgDriverLink1.VendorLib := ExtractFilePath(ParamStr(0)) + 'pgclient\win32\libpq.dll';
 //  {$ENDIF}
 
-  FDConnection1.Params.Clear;
-  FDConnection1.Params.Add('DriverID=PG');
+  FDConnectionSupabase.Params.Clear;
+  FDConnectionSupabase.Params.Add('DriverID=PG');
 
   // ----- SUPABASE (MODO APP) -----
-  FDConnection1.Params.Add('Server=aws-0-sa-east-1.pooler.supabase.com');
-  FDConnection1.Params.Add('Port=5432'); // session pooler
-  FDConnection1.Params.Add('Database=postgres');
+  FDConnectionSupabase.Params.Add('Server=aws-0-sa-east-1.pooler.supabase.com');
+  FDConnectionSupabase.Params.Add('Port=5432'); // session pooler
+  FDConnectionSupabase.Params.Add('Database=postgres');
 
   // usuário COM project-ref (ex.: postgres.dojavjvqvobnumebaouc)
-  FDConnection1.Params.Add('User_Name=postgres.dojavjvqvobnumebaouc');
-  FDConnection1.Params.Add('Password=aUilaqvCRLaFLOqr');
+  FDConnectionSupabase.Params.Add('User_Name=postgres.dojavjvqvobnumebaouc');
+  FDConnectionSupabase.Params.Add('Password=aUilaqvCRLaFLOqr');
 
   // TLS obrigatório
-  FDConnection1.Params.Add('SSLMode=require');
+  FDConnectionSupabase.Params.Add('SSLMode=require');
 
   // encoding
-  FDConnection1.Params.Add('CharacterSet=UTF8');
+  FDConnectionSupabase.Params.Add('CharacterSet=UTF8');
 
   // extras
-  FDConnection1.Params.Add('MetaDefSchema=public');
-  FDConnection1.Params.Add('MetaCurSchema=public');
-  FDConnection1.Params.Add('LoginTimeout=30');
-  FDConnection1.LoginPrompt := False;
+  FDConnectionSupabase.Params.Add('MetaDefSchema=public');
+  FDConnectionSupabase.Params.Add('MetaCurSchema=public');
+  FDConnectionSupabase.Params.Add('LoginTimeout=30');
+  FDConnectionSupabase.LoginPrompt := False;
 
   try
-    FDConnection1.Connected := True;
+    FDConnectionSupabase.Connected := True;
   except
     on E: Exception do ShowMessage('Erro: ' + E.Message);
-  end;
-
-  // --- SQL Server (TOTVS) ---
-  // Ler todos os valores do INI primeiro
-  IniFileName := ExtractFilePath(Application.ExeName) + 'BaseSIC.ini';
-  IniFile := TIniFile.Create(IniFileName);
-
-  sServer           := IniFile.ReadString('Protheus', 'Server', '');
-  sDatabase         := IniFile.ReadString('Protheus', 'Database', '');
-  sUsername         := IniFile.ReadString('Protheus', 'Username', '');
-//  sPassword         := Biblioteca.MyCrypt('D', IniFile.ReadString('Protheus', 'Password', ''));
-  sNetwork          := IniFile.ReadString('Protheus', 'Network', '');
-  sAddress          := IniFile.ReadString('Protheus', 'Address', '');
-  sWorkstation      := IniFile.ReadString('Protheus', 'Workstation', '');
-  sAppName          := IniFile.ReadString('Protheus', 'ApplicationName', '');
-  sVendorLib        := IniFile.ReadString('Protheus', 'VendorLib', '');
-  sOSAuthent        := IniFile.ReadString('Protheus', 'OSAuthent', 'False');
-  sMARS             := IniFile.ReadString('Protheus', 'MARS', 'No');
-
-  // Driver e parâmetros básicos
-  FDConnectionTOTVS.Params.Clear;
-  FDConnectionTOTVS.DriverName := 'MSSQL';
-  FDConnectionTOTVS.Params.Add('Server='   + sServer);
-  FDConnectionTOTVS.Params.Add('Database=' + sDatabase);
-
-  // Autenticação integrada ou não
-  sOSAuthent := IniFile.ReadString('Protheus', 'OSAuthent', 'False');
-
-  if SameText(sOSAuthent, 'Yes') then
-    OSAuthentValue := 'Yes'
-  else
-    OSAuthentValue := 'No';
-
-  FDConnectionTOTVS.Params.Add('OSAuthent=' + OSAuthentValue);
-
-  // Se for SQL Auth, informe usuário e senha
-  if OSAuthentValue = 'No' then
-  begin
-    FDConnectionTOTVS.Params.Add('User_Name=' + sUsername);
-    FDConnectionTOTVS.Params.Add('Password='  + sPassword);
-  end;
-
-  // MARS
-  if SameText(sMARS, 'Yes') then
-    MARSValue := 'Yes'
-  else
-    MARSValue := 'No';
-
-  FDConnectionTOTVS.Params.Add('MARS=' + MARSValue);
-
-  // NetworkLibrary / Address
-  if SameText(Trim(sNetwork), 'TCP/IP') then
-    NetworkLibValue := 'DBMSSOCN'
-  else if SameText(Trim(sNetwork), 'Named Pipes') then
-    NetworkLibValue := 'DBNMPNTW'
-  else
-    NetworkLibValue := sNetwork;
-
-  FDConnectionTOTVS.Params.Add('NetworkLibrary=' + NetworkLibValue);
-
-  if Trim(sAddress) <> '' then
-    FDConnectionTOTVS.Params.Add('NetworkAddress=' + sAddress);
-
-  // WorkstationID, ApplicationName, VendorLib (se houver)
-  if Trim(sWorkstation) <> '' then
-    FDConnectionTOTVS.Params.Add('WorkstationID=' + sWorkstation);
-
-  if Trim(sAppName) <> '' then
-    FDConnectionTOTVS.Params.Add('ApplicationName=' + sAppName);
-
-  if Trim(sVendorLib) <> '' then
-    FDConnectionTOTVS.Params.Add('VendorLib=' + sVendorLib);
-
-  // Conecta
-  try
-    FDConnectionTOTVS.Connected := True;
-  except
-    on E: Exception do
-      ShowMessage('Falha ao conectar na TOTVS: ' + E.Message);
   end;
 end;
 

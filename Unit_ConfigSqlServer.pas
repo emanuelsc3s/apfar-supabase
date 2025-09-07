@@ -42,8 +42,6 @@ type
     EditVendorLib: TEdit;
     btnSalvar: TPanel;
     btnFechar: TPanel;
-    FDConnection: TFDConnection;
-    FDPhysMSSQLDriverLink: TFDPhysMSSQLDriverLink;
     procedure btnSalvarClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure btnFecharClick(Sender: TObject);
@@ -52,7 +50,7 @@ type
     { Private declarations }
   public
     { Public declarations }
-    procedure ConfigureAndConnectFDConnection(AIniFile: TIniFile);
+    procedure ConfigureAndConnectFDConnection(AIniFile: TIniFile; AFDConnection: TFDConnection);
   end;
 
 var
@@ -180,7 +178,7 @@ begin
   end;
 end;
 
-procedure TForm_ConfigSqlServer.ConfigureAndConnectFDConnection(AIniFile: TIniFile);
+procedure TForm_ConfigSqlServer.ConfigureAndConnectFDConnection(AIniFile: TIniFile; AFDConnection: TFDConnection);
 var
   sServer, sDatabase, sUsername, sPassword,
   sNetwork, sAddress, sWorkstation, sAppName, sVendorLib,
@@ -188,9 +186,9 @@ var
 
   OSAuthentValue, MARSValue, NetworkLibValue : string;
 begin
-  if not Assigned(FDConnection) then
+  if not Assigned(AFDConnection) then
   begin
-    ShowMessage('Componente FDConnection não encontrado no formulário.');
+    ShowMessage('Componente FDConnection não encontrado.');
     Exit;
   end;
 
@@ -208,10 +206,10 @@ begin
   sMARS             := AIniFile.ReadString('Protheus', 'MARS', 'No');
 
   // Driver e parâmetros básicos
-  FDConnection.Params.Clear;
-  FDConnection.DriverName := 'MSSQL';
-  FDConnection.Params.Add('Server='   + sServer);
-  FDConnection.Params.Add('Database=' + sDatabase);
+  AFDConnection.Params.Clear;
+  AFDConnection.DriverName := 'MSSQL';
+  AFDConnection.Params.Add('Server='   + sServer);
+  AFDConnection.Params.Add('Database=' + sDatabase);
 
   // Autenticação integrada ou não
   sOSAuthent := AIniFile.ReadString('Protheus', 'OSAuthent', 'False');
@@ -221,13 +219,13 @@ begin
   else
     OSAuthentValue := 'No';
 
-  FDConnection.Params.Add('OSAuthent=' + OSAuthentValue);
+  AFDConnection.Params.Add('OSAuthent=' + OSAuthentValue);
 
   // Se for SQL Auth, informe usuário e senha
   if OSAuthentValue = 'No' then
   begin
-    FDConnection.Params.Add('User_Name=' + sUsername);
-    FDConnection.Params.Add('Password='  + sPassword);
+    AFDConnection.Params.Add('User_Name=' + sUsername);
+    AFDConnection.Params.Add('Password='  + sPassword);
   end;
 
   // MARS
@@ -236,7 +234,7 @@ begin
   else
     MARSValue := 'No';
 
-  FDConnection.Params.Add('MARS=' + MARSValue);
+  AFDConnection.Params.Add('MARS=' + MARSValue);
 
   // NetworkLibrary / Address
   if SameText(Trim(sNetwork), 'TCP/IP') then
@@ -246,22 +244,22 @@ begin
   else
     NetworkLibValue := sNetwork;
 
-  FDConnection.Params.Add('NetworkLibrary=' + NetworkLibValue);
+  AFDConnection.Params.Add('NetworkLibrary=' + NetworkLibValue);
 
   if Trim(sAddress) <> '' then
-    FDConnection.Params.Add('NetworkAddress=' + sAddress);
+    AFDConnection.Params.Add('NetworkAddress=' + sAddress);
 
   // WorkstationID, ApplicationName, VendorLib (se houver)
   if Trim(sWorkstation) <> '' then
-    FDConnection.Params.Add('WorkstationID=' + sWorkstation);
+    AFDConnection.Params.Add('WorkstationID=' + sWorkstation);
   if Trim(sAppName) <> '' then
-    FDConnection.Params.Add('ApplicationName=' + sAppName);
+    AFDConnection.Params.Add('ApplicationName=' + sAppName);
   if Trim(sVendorLib) <> '' then
-    FDConnection.Params.Add('VendorLib=' + sVendorLib);
+    AFDConnection.Params.Add('VendorLib=' + sVendorLib);
 
   // Conecta
   try
-    FDConnection.Connected := True;
+    AFDConnection.Connected := True;
   except
     on E: Exception do
       ShowMessage('Falha ao conectar na TOTVS: ' + E.Message);

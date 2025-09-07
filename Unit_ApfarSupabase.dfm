@@ -2,7 +2,7 @@ object Form_Principal: TForm_Principal
   Left = 0
   Top = 0
   Caption = 'Form_Principal'
-  ClientHeight = 359
+  ClientHeight = 350
   ClientWidth = 863
   Color = clBtnFace
   Font.Charset = ANSI_CHARSET
@@ -11,6 +11,7 @@ object Form_Principal: TForm_Principal
   Font.Name = 'Verdana'
   Font.Style = []
   OldCreateOrder = False
+  Position = poScreenCenter
   OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
@@ -18,7 +19,7 @@ object Form_Principal: TForm_Principal
     Left = 8
     Top = 8
     Width = 847
-    Height = 313
+    Height = 289
     DataSource = DataSource1
     TabOrder = 0
     TitleFont.Charset = ANSI_CHARSET
@@ -27,16 +28,64 @@ object Form_Principal: TForm_Principal
     TitleFont.Name = 'Verdana'
     TitleFont.Style = []
   end
-  object btn_Importar: TButton
-    Left = 780
-    Top = 327
-    Width = 75
-    Height = 25
+  object btn_Importar: TPanel
+    Left = 609
+    Top = 303
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
     Caption = 'Importar'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
     TabOrder = 1
     OnClick = btn_ImportarClick
   end
-  object FDConnection1: TFDConnection
+  object btn_Fechar: TPanel
+    Left = 735
+    Top = 303
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Fechar'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 2
+    OnClick = btn_FecharClick
+  end
+  object btn_Configurar: TPanel
+    Left = 8
+    Top = 303
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Configurar BD'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 3
+    OnClick = btn_ConfigurarClick
+  end
+  object FDConnectionSupabase: TFDConnection
     Params.Strings = (
       'Server=aws-0-sa-east-1.pooler.supabase.com'
       'Database=postgres'
@@ -51,7 +100,7 @@ object Form_Principal: TForm_Principal
     Top = 112
   end
   object qSupabase: TFDQuery
-    Connection = FDConnection1
+    Connection = FDConnectionSupabase
     Left = 368
     Top = 216
   end

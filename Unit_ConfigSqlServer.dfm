@@ -1,4 +1,4 @@
-﻿object Form_ConfigSqlServer: TForm_ConfigSqlServer
+object Form_ConfigSqlServer: TForm_ConfigSqlServer
   Left = 0
   Top = 0
   BorderIcons = []
@@ -284,14 +284,5 @@
     ParentFont = False
     TabOrder = 13
     OnClick = btnFecharClick
-  end
-  object FDConnection: TFDConnection
-    LoginPrompt = False
-    Left = 408
-    Top = 240
-  end
-  object FDPhysMSSQLDriverLink: TFDPhysMSSQLDriverLink
-    Left = 408
-    Top = 296
   end
 end
