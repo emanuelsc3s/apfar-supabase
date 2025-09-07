@@ -302,13 +302,16 @@ begin
 
         qUp.ExecSQL;
         
+        // Controle de performance: atualiza interface a cada 10 registros
         if CurrentRecord mod 10 = 0 then
         begin
           try
+            // Mantém interface responsiva durante operação longa
             Application.ProcessMessages;
           except
             // Ignora erros no ProcessMessages
           end;
+          // Pausa de 10ms para melhor experiência visual e reduzir uso de CPU
           Sleep(10);
         end;
         
