@@ -1,4 +1,4 @@
-object Form_ConfigSqlServer: TForm_ConfigSqlServer
+﻿object Form_ConfigSqlServer: TForm_ConfigSqlServer
   Left = 0
   Top = 0
   BorderIcons = []

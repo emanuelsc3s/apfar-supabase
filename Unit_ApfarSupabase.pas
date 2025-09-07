@@ -13,7 +13,7 @@ uses
   FireDAC.Phys.MSSQLDef, FireDAC.Phys.ODBCBase, FireDAC.Phys.MSSQL, System.IniFiles;
 
 type
-  TForm1 = class(TForm)
+  TForm_Principal = class(TForm)
     FDConnection1: TFDConnection;
     qSupabase: TFDQuery;
     FDPhysPgDriverLink: TFDPhysPgDriverLink;
@@ -32,13 +32,13 @@ type
   end;
 
 var
-  Form1: TForm1;
+  Form_Principal: TForm_Principal;
 
 implementation
 
 {$R *.dfm}
 
-procedure TForm1.btn_ImportarClick(Sender: TObject);
+procedure TForm_Principal.btn_ImportarClick(Sender: TObject);
 const
   SQL_UPSERT =
     'INSERT INTO public.tbreceber (' +
@@ -104,42 +104,62 @@ begin
   FDConnection1.Connected     := True;
 
   // 2) Abre o SELECT no SQL Server
-  qTOTVS.Close;
-  qTOTVS.Connection := FDConnectionTOTVS;
-  qTOTVS.SQL.Text := '/* coloque aqui o seu SELECT exatamente como enviou */ ' +
-    'SELECT ' +
-    ' SE1.R_E_C_N_O_ e1_recno,' +
-    ' SE1.E1_NUM titulo, SE1.E1_PREFIXO prefixo, SE1.E1_TIPO tipo, SE1.E1_SALDO saldo,' +
-    ' SE1.E1_VALOR valor, SE1.E1_VALOR - SE1.E1_SALDO valor_pago,' +
-    ' CASE WHEN SE1.E1_VENCREA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_VENCREA AS DATETIME),103)  END AS vencimento,' +
-    ' CASE WHEN SE1.E1_EMISSAO <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_EMISSAO AS DATETIME),103) END AS emissao,' +
-    ' CASE WHEN SE1.E1_BAIXA   <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA   AS DATETIME),103) END AS data_baixa,' +
-    ' SA1.A1_COD+''-''+RTRIM(SA1.A1_NOME) cliente,' +
-    ' RTRIM(SA1.A1_MUN) cidade, RTRIM(SA1.A1_EST) uf,' +
-    ' SE1.E1_CLIENTE erp_cliente, SE1.E1_HIST obs, SA1.A1_END endereco, SA1.A1_CEP cep,' +
-    ' SA1.A1_CGC cnpj, SA1.A1_TEL telefone, SA1.A1_MCOMPRA valor_mcompra,' +
-    ' CONVERT(VARCHAR,CAST(SA1.A1_PRICOM AS DATETIME),103) data_pcompra,' +
-    ' CONVERT(VARCHAR,CAST(SA1.A1_ULTCOM AS DATETIME),103) data_ultimacompra,' +
-    ' SA1.A1_LC valor_limitecredito, SA1.A1_BAIRRO bairro, SA1.A1_MATR maior_atraso,' +
-    ' SE1.E1_DESCONT valor_desconto, SE1.E1_VALLIQ valor_liquidado, SA1.A1_DDD cliente_ddd,' +
-    ' CASE SA1.A1_PESSOA WHEN ''F'' THEN ''Fisica'' WHEN ''J'' THEN ''Juridica'' END AS cliente_pessoa,' +
-    ' CASE SA1.A1_YTPCLI WHEN ''1'' THEN ''Publico'' WHEN ''2'' THEN ''Privado'' WHEN ''3'' THEN ''Distribuidor'' ' +
-    '      WHEN ''4'' THEN ''Farmacias e Drogarias Privadas'' WHEN ''5'' THEN ''Demais Clientes'' END AS cliente_tipo,' +
-    ' SE1.E1_XEMPENH empenho, SE1.E1_XPROCES processo ' +
-    ' FROM SE1010 (NOLOCK) SE1 ' +
-    ' LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = '''' ' +
-    ' WHERE SE1.D_E_L_E_T_ = '''' ' +
-    '   AND ((SA1.A1_YENTREG = '''') OR (SA1.A1_YENTREG = ''N'')) ' +
-    '   AND SE1.E1_VEND1 = ''000050'' ' +
-    '   AND SE1.E1_TIPO NOT IN (''NCC'',''RA'') ' +
-    '   AND SE1.E1_SUSPENS <> ''S'' ' +
-    '   AND SE1.E1_SALDO > 0 ' +
-    ' ORDER BY SA1.A1_COD, SE1.E1_VENCREA';
+  with qTOTVS do
+  begin
+    Close;
+    Connection := FDConnectionTOTVS;
+
+    SQL.Clear;
+    SQL.Add('SELECT');
+    SQL.Add(' SE1.R_E_C_N_O_ e1_recno,');
+    SQL.Add(' SE1.E1_NUM titulo, SE1.E1_PREFIXO prefixo, SE1.E1_TIPO tipo, SE1.E1_SALDO saldo,');
+    SQL.Add(' SE1.E1_VALOR valor, SE1.E1_VALOR - SE1.E1_SALDO valor_pago,');
+    SQL.Add(' CASE WHEN SE1.E1_VENCREA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_VENCREA AS DATETIME),103)  END AS vencimento,');
+    SQL.Add(' CASE WHEN SE1.E1_EMISSAO <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_EMISSAO AS DATETIME),103) END AS emissao,');
+    SQL.Add(' CASE WHEN SE1.E1_BAIXA   <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA AS DATETIME),103)   END AS data_baixa,');
+    SQL.Add(' SA1.A1_COD+''-''+RTRIM(SA1.A1_NOME) cliente,');
+    SQL.Add(' RTRIM(SA1.A1_MUN) cidade,');
+    SQL.Add(' RTRIM(SA1.A1_EST) uf,');
+    SQL.Add(' SE1.E1_CLIENTE erp_cliente, SE1.E1_HIST obs,');
+    SQL.Add(' SA1.A1_END endereco,');
+    SQL.Add(' SA1.A1_CEP cep,');
+    SQL.Add(' SA1.A1_CGC cnpj,');
+    SQL.Add(' SA1.A1_TEL telefone,');
+    SQL.Add(' SA1.A1_MCOMPRA valor_mcompra,');
+    SQL.Add(' CONVERT(VARCHAR,CAST(SA1.A1_PRICOM AS DATETIME),103) data_pcompra,');
+    SQL.Add(' CONVERT(VARCHAR,CAST(SA1.A1_ULTCOM AS DATETIME),103) data_ultimacompra, SA1.A1_NOME cliente,');
+    SQL.Add(' SA1.A1_LC valor_limitecredito,');
+    SQL.Add(' SA1.A1_EST uf, SA1.A1_MUN cidade, SA1.A1_BAIRRO bairro, SA1.A1_MATR maior_atraso,');
+    SQL.Add(' SE1.E1_DESCONT valor_desconto, SE1.E1_VALLIQ valor_liquidado, SA1.A1_DDD cliente_ddd,');
+    SQL.Add(' CASE SA1.A1_PESSOA');
+    SQL.Add(' WHEN ''F'' THEN ''Fisica''');
+    SQL.Add(' WHEN ''J'' THEN ''Juridica''');
+    SQL.Add(' END AS cliente_pessoa,');
+    SQL.Add(' CASE SA1.A1_YTPCLI');
+    SQL.Add(' WHEN ''1'' THEN ''Publico''');
+    SQL.Add(' WHEN ''2'' THEN ''Privado''');
+    SQL.Add(' WHEN ''3'' THEN ''Distribuidor''');
+    SQL.Add(' WHEN ''4'' THEN ''Farmacias e Drogarias Privadas''');
+    SQL.Add(' WHEN ''5'' THEN ''Demais Clientes''');
+    SQL.Add(' END AS cliente_tipo,');
+    SQL.Add(' SE1.E1_XEMPENH empenho, SE1.E1_XPROCES processo');
+    SQL.Add(' FROM SE1010 (NOLOCK) SE1');
+    SQL.Add(' LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = ''''');
+    SQL.Add(' WHERE SE1.D_E_L_E_T_ = ''''');
+    SQL.Add(' AND ((SA1.A1_YENTREG = '''') OR (SA1.A1_YENTREG = ''N''))');
+    SQL.Add(' AND SE1.E1_VEND1 = ''000050''');
+    SQL.Add(' AND SE1.E1_TIPO NOT IN (''NCC'',''RA'')');
+    SQL.Add(' AND SE1.E1_SUSPENS <> ''S''');
+    SQL.Add(' AND SE1.E1_SALDO > 0');
+    SQL.Add('-- AND DATEDIFF(DAY, CONVERT(DATETIME, SE1.E1_VENCREA, 112), GETDATE()) BETWEEN ''1'' AND ''99999''');
+    SQL.Add(' ORDER BY SA1.A1_COD, SE1.E1_VENCREA');
+  end;
   qTOTVS.Open;
 
   // 3) Prepara o UPSERT no Supabase
   qUp := TFDQuery.Create(nil);
   try
+    qUp.DataSource := DataSource1;
     qUp.Connection := FDConnection1;
     qUp.SQL.Text   := SQL_UPSERT;
     qUp.Prepare;
@@ -202,7 +222,7 @@ begin
   end;
 end;
 
-procedure TForm1.FormCreate(Sender: TObject);
+procedure TForm_Principal.FormCreate(Sender: TObject);
 var
   IniFile     : TIniFile;
   IniFileName : string;

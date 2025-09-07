@@ -1,4 +1,4 @@
-unit Unit_ConfigSqlServer;
+Ôªøunit Unit_ConfigSqlServer;
 
 interface
 
@@ -81,7 +81,7 @@ begin
   IniFile := TIniFile.Create(IniFileName);
   try
     try
-      // Salvar as configuraÁıes no arquivo INI na seÁ„o [Protheus]
+      // Salvar as configura√ß√µes no arquivo INI na se√ß√£o [Protheus]
       IniFile.WriteString('Protheus', 'Server',      Trim(EditServer.Text));
       IniFile.WriteString('Protheus', 'Database',    Trim(EditDatabase.Text));
       IniFile.WriteString('Protheus', 'Username',    Trim(EditUsername.Text));
@@ -109,11 +109,11 @@ begin
       IniFile.WriteString('Protheus', 'MARS', MARSValue);
 
       // Exibir uma mensagem de sucesso
-      ShowMessage('ConfiguraÁıes salvas com sucesso!');
+      ShowMessage('Configura√ß√µes salvas com sucesso!');
     except
       on E: Exception do
       begin
-        ShowMessage('Erro ao tentar salvar as configuraÁıes: ' + E.Message);
+        ShowMessage('Erro ao tentar salvar as configura√ß√µes: ' + E.Message);
       end;
     end;
   finally
@@ -147,7 +147,7 @@ begin
   IniFileName := ExtractFilePath(Application.ExeName) + 'BaseSIC.ini';
   IniFile := TIniFile.Create(IniFileName);
   try
-    // Carregar as configuraÁıes da seÁ„o [Protheus] do arquivo INI
+    // Carregar as configura√ß√µes da se√ß√£o [Protheus] do arquivo INI
     EditServer.Text            := IniFile.ReadString('Protheus', 'Server',   '');
     EditDatabase.Text          := IniFile.ReadString('Protheus', 'Database', '');
     EditUsername.Text          := IniFile.ReadString('Protheus', 'Username', '');
@@ -158,14 +158,14 @@ begin
     EditApplicationName.Text   := IniFile.ReadString('Protheus', 'ApplicationName', '');
     EditVendorLib.Text         := IniFile.ReadString('Protheus', 'VendorLib', '');
 
-    // Carregar o valor de OSAuthent (True/False) e selecionar a opÁ„o correta no ComboBox
+    // Carregar o valor de OSAuthent (True/False) e selecionar a op√ß√£o correta no ComboBox
     OSAuthent := IniFile.ReadString('Protheus', 'OSAuthent', 'False');
 
     if OSAuthent = 'Yes' then
       ComboBoxOSAuthent.ItemIndex := 0  // Sim (True)
     else
-      ComboBoxOSAuthent.ItemIndex := 1; // N„o (False)
-    // Carregar o valor de MARS (Yes/No) e selecionar a opÁ„o correta no ComboBox
+      ComboBoxOSAuthent.ItemIndex := 1; // N√£o (False)
+    // Carregar o valor de MARS (Yes/No) e selecionar a op√ß√£o correta no ComboBox
 
     MARS := IniFile.ReadString('Protheus', 'MARS', 'No');
 
@@ -190,7 +190,7 @@ var
 begin
   if not Assigned(FDConnection) then
   begin
-    ShowMessage('Componente FDConnection n„o encontrado no formul·rio.');
+    ShowMessage('Componente FDConnection n√£o encontrado no formul√°rio.');
     Exit;
   end;
 
@@ -207,13 +207,13 @@ begin
   sOSAuthent        := AIniFile.ReadString('Protheus', 'OSAuthent', 'False');
   sMARS             := AIniFile.ReadString('Protheus', 'MARS', 'No');
 
-  // Driver e par‚metros b·sicos
+  // Driver e par√¢metros b√°sicos
   FDConnection.Params.Clear;
   FDConnection.DriverName := 'MSSQL';
   FDConnection.Params.Add('Server='   + sServer);
   FDConnection.Params.Add('Database=' + sDatabase);
 
-  // AutenticaÁ„o integrada ou n„o
+  // Autentica√ß√£o integrada ou n√£o
   sOSAuthent := AIniFile.ReadString('Protheus', 'OSAuthent', 'False');
 
   if SameText(sOSAuthent, 'Yes') then
@@ -223,7 +223,7 @@ begin
 
   FDConnection.Params.Add('OSAuthent=' + OSAuthentValue);
 
-  // Se for SQL Auth, informe usu·rio e senha
+  // Se for SQL Auth, informe usu√°rio e senha
   if OSAuthentValue = 'No' then
   begin
     FDConnection.Params.Add('User_Name=' + sUsername);
