@@ -1,0 +1,76 @@
+﻿object Form_Activity: TForm_Activity
+  Left = 0
+  Top = 0
+  BorderStyle = bsNone
+  Caption = 'Atividade'
+  ClientHeight = 186
+  ClientWidth = 548
+  Color = 16119543
+  TransparentColorValue = clSkyBlue
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  FormStyle = fsStayOnTop
+  OldCreateOrder = False
+  Position = poScreenCenter
+  PrintScale = poPrintToFit
+  Visible = True
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel2: TPanel
+    Left = 0
+    Top = 0
+    Width = 548
+    Height = 186
+    Align = alClient
+    BevelOuter = bvNone
+    BorderWidth = 2
+    Color = clSkyBlue
+    ParentBackground = False
+    TabOrder = 0
+    object Panel1: TPanel
+      Left = 2
+      Top = 137
+      Width = 544
+      Height = 47
+      Align = alBottom
+      BevelOuter = bvNone
+      TabOrder = 1
+      object Label_Status: TLabel
+        Left = 16
+        Top = 15
+        Width = 55
+        Height = 19
+        Caption = 'Status...'
+        Font.Charset = ANSI_CHARSET
+        Font.Color = 10053126
+        Font.Height = -16
+        Font.Name = 'Calibri'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+    end
+    object Panel3: TPanel
+      Left = 2
+      Top = 2
+      Width = 544
+      Height = 135
+      Align = alClient
+      BevelOuter = bvNone
+      Color = clWhite
+      ParentBackground = False
+      TabOrder = 0
+      object ActivityIndicator: TActivityIndicator
+        Left = 232
+        Top = 35
+        Cursor = crHourGlass
+        Animate = True
+        FrameDelay = 120
+        IndicatorSize = aisXLarge
+        IndicatorType = aitRotatingSector
+      end
+    end
+  end
+end

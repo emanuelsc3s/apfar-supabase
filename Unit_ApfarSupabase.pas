@@ -43,7 +43,7 @@ implementation
 
 {$R *.dfm}
 
-uses Unit_ConfigSqlServer;
+uses Unit_ConfigSqlServer, Unit_Activity;
 
 
 procedure TForm_Principal.btn_FecharClick(Sender: TObject);
@@ -53,6 +53,20 @@ end;
 
 procedure TForm_Principal.btn_ImportarClick(Sender: TObject);
 const
+  FROM_JOIN_CLAUSE = 
+    'FROM SE1010 (NOLOCK) SE1 ' +
+    'LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = '''' ';
+
+  WHERE_CLAUSE = 
+    ' WHERE SE1.D_E_L_E_T_ = '''' ' +
+    ' AND ((SA1.A1_YENTREG = '''') OR (SA1.A1_YENTREG = ''N'')) ' +
+    ' AND SE1.E1_VEND1 = ''000050'' ' +
+    ' AND SE1.E1_TIPO NOT IN (''NCC'',''RA'') ' +
+    ' AND SE1.E1_SALDO > 0 ' +
+    ' AND SE1.E1_SUSPENS <> ''S'' ';
+    // Condições opcionais (comentadas):
+    // ' AND DATEDIFF(DAY, CONVERT(DATETIME, SE1.E1_VENCREA, 112), GETDATE()) BETWEEN ''1'' AND ''99999'' ';
+
   SQL_UPSERT =
     'INSERT INTO public.tbreceber (' +
     '  e1_recno, titulo, prefixo, tipo, saldo, valor, valor_pago,' +
@@ -87,6 +101,7 @@ var
   qUp: TFDQuery;
   fs: TFormatSettings;
   Ini: TIniFile;
+  TotalRecords, CurrentRecord: Integer;
 
   procedure SetDateParam(const PName: string; F: TField);
   var s: string; d: TDateTime;
@@ -168,20 +183,28 @@ begin
     SQL.Add(' WHEN ''5'' THEN ''Demais Clientes''');
     SQL.Add(' END AS cliente_tipo,');
     SQL.Add(' SE1.E1_XEMPENH empenho, SE1.E1_XPROCES processo');
-    SQL.Add(' FROM SE1010 (NOLOCK) SE1');
-    SQL.Add(' LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = ''''');
-    SQL.Add(' WHERE SE1.D_E_L_E_T_ = ''''');
-    SQL.Add(' AND ((SA1.A1_YENTREG = '''') OR (SA1.A1_YENTREG = ''N''))');
-    SQL.Add(' AND SE1.E1_VEND1 = ''000050''');
-    SQL.Add(' AND SE1.E1_TIPO NOT IN (''NCC'',''RA'')');
-    SQL.Add(' AND SE1.E1_SUSPENS <> ''S''');
-//    SQL.Add(' AND SE1.E1_SALDO > 0');
-//    SQL.Add('-- AND DATEDIFF(DAY, CONVERT(DATETIME, SE1.E1_VENCREA, 112), GETDATE()) BETWEEN ''1'' AND ''99999''');
-
+    SQL.Add(FROM_JOIN_CLAUSE);
+    SQL.Add(WHERE_CLAUSE);
     SQL.Add(' ORDER BY SA1.A1_COD, SE1.E1_VENCREA');
 
   end;
   qTOTVS.Open;
+
+  // Exibir Form de Atividade e contar registros
+  if not Assigned(Form_Activity) then
+  begin
+    Application.CreateForm(TForm_Activity, Form_Activity);
+    Form_Activity.Show;
+    Form_Activity.Label_Status.Caption := 'Executando consulta...';
+    Application.ProcessMessages;
+  end;
+
+  TotalRecords := FDConnectionTOTVS.ExecSQLScalar(
+    'SELECT COUNT(*) ' + FROM_JOIN_CLAUSE + WHERE_CLAUSE
+  );
+  Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords]);
+  Application.ProcessMessages;
+  Sleep(500);
 
   // 3) Prepara o UPSERT no Supabase
   qUp := TFDQuery.Create(nil);
@@ -192,10 +215,15 @@ begin
     FDConnectionSupabase.StartTransaction;
     try
       qTOTVS.First;
+      CurrentRecord := 0;
       while not qTOTVS.Eof do
       begin
+        Inc(CurrentRecord);
+        Form_Activity.Label_Status.Caption := Format('Importando registro %d de %d...', [CurrentRecord, TotalRecords]);
+        Application.ProcessMessages;
+
         qUp.ParamByName('e1_recno').DataType           := ftLargeint;
-        qUp.ParamByName('e1_recno').AsLargeInt          := qTOTVS.FieldByName('e1_recno').AsLargeInt;
+        qUp.ParamByName('e1_recno').AsLargeInt         := qTOTVS.FieldByName('e1_recno').AsLargeInt;
         qUp.ParamByName('titulo').AsString             := qTOTVS.FieldByName('titulo').AsString;
         qUp.ParamByName('prefixo').AsString            := qTOTVS.FieldByName('prefixo').AsString;
         qUp.ParamByName('tipo').AsString               := qTOTVS.FieldByName('tipo').AsString;
@@ -231,15 +259,36 @@ begin
         qUp.ParamByName('processo').AsString           := qTOTVS.FieldByName('processo').AsString;
 
         qUp.ExecSQL;
+        
+        if CurrentRecord mod 10 = 0 then
+        begin
+          Application.ProcessMessages;
+          Sleep(10);
+        end;
+        
         qTOTVS.Next;
       end;
 
       FDConnectionSupabase.Commit;
+      
+      if Assigned(Form_Activity) then
+      begin
+        Form_Activity.Close;
+        FreeAndNil(Form_Activity);
+      end;
+      
       ShowMessage('Importação concluída com sucesso.');
     except
       on E: Exception do
       begin
         FDConnectionSupabase.Rollback;
+        
+        if Assigned(Form_Activity) then
+        begin
+          Form_Activity.Close;
+          FreeAndNil(Form_Activity);
+        end;
+        
         raise;
       end;
     end;

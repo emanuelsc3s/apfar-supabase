@@ -139,6 +139,10 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="Biblioteca.pas"/>
+        <DCCReference Include="Unit_Activity.pas">
+            <Form>Form_Activity</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
