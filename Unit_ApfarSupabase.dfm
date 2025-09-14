@@ -92,7 +92,7 @@ object Form_Principal: TForm_Principal
     Height = 35
     Cursor = crHandPoint
     BevelOuter = bvNone
-    Caption = 'Imp. Receber'
+    Caption = 'Imp. Licita'#231#227'o'
     Color = 12477460
     Font.Charset = ANSI_CHARSET
     Font.Color = clWhite
@@ -102,6 +102,25 @@ object Form_Principal: TForm_Principal
     ParentBackground = False
     ParentFont = False
     TabOrder = 4
+  end
+  object btn_ImportarLoteDesvio: TPanel
+    Left = 336
+    Top = 303
+    Width = 141
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Imp. Lote Desvio'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 5
+    OnClick = btn_ImportarLoteDesvioClick
   end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (
@@ -145,5 +164,18 @@ object Form_Principal: TForm_Principal
     DataSet = qTOTVS
     Left = 392
     Top = 192
+  end
+  object FDConnectionSICFAR: TFDConnection
+    Left = 528
+    Top = 24
+  end
+  object qSICFAR: TFDQuery
+    Connection = FDConnectionSICFAR
+    Left = 528
+    Top = 136
+  end
+  object FBDriverLink: TFDPhysFBDriverLink
+    Left = 528
+    Top = 80
   end
 end

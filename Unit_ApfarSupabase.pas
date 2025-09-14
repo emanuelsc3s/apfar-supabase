@@ -10,8 +10,8 @@ uses
   Data.DB, FireDAC.Comp.Client, FireDAC.Phys.PG, FireDAC.Phys.PGDef,
   FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
   FireDAC.Comp.DataSet, Vcl.StdCtrls, Vcl.Grids, Vcl.DBGrids,
-  FireDAC.Phys.MSSQLDef, FireDAC.Phys.ODBCBase, FireDAC.Phys.MSSQL, System.IniFiles,
-  Vcl.ExtCtrls;
+  FireDAC.Phys.MSSQLDef, FireDAC.Phys.ODBCBase, FireDAC.Phys.MSSQL, FireDAC.Phys.FB, FireDAC.Phys.FBDef, System.IniFiles,
+  Vcl.ExtCtrls, FireDAC.Phys.IBBase;
 
 type
   TForm_Principal = class(TForm)
@@ -27,10 +27,15 @@ type
     btn_Fechar: TPanel;
     btn_Configurar: TPanel;
     btn_ImportarLicitacao: TPanel;
+    btn_ImportarLoteDesvio: TPanel;
+    FDConnectionSICFAR: TFDConnection;
+    qSICFAR: TFDQuery;
+    FBDriverLink: TFDPhysFBDriverLink;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
     procedure btn_FecharClick(Sender: TObject);
+    procedure btn_ImportarLoteDesvioClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -52,18 +57,227 @@ begin
   Application.Terminate;
 end;
 
+procedure TForm_Principal.btn_ImportarLoteDesvioClick(Sender: TObject);
+var
+  Ini          : TIniFile;
+  TotalRecords, CurrentRecord: Integer;
+  ids, firstId: string;
+  posComma: Integer;
+
+  procedure CloseActivityForm;
+  begin
+    if Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity.Close;
+      except
+        // Ignora erros de fechamento
+      end;
+      try
+        FreeAndNil(Form_Activity);
+      except
+        // Ignora erros de liberação
+      end;
+    end;
+  end;
+begin
+  // Desabilita botão durante a operação
+  btn_ImportarLoteDesvio.Enabled := False;
+  Ini        := nil;
+  TotalRecords := 0;
+  CurrentRecord := 0;
+
+  try
+    try
+    // 1) Ler configurações e garantir conexões (TOTVS e SICFAR)
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+
+    Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+
+    // 1) Conecta ao Banco FDConnection
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionTOTVS, 'Protheus');
+
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
+
+    // 2) Preparar consulta no SICFAR usando o componente qSICFAR do formulário
+    qSICFAR.Close;
+    qSICFAR.Connection := FDConnectionSICFAR;
+    qSICFAR.SQL.Clear;
+    qSICFAR.SQL.Add('SELECT');
+    qSICFAR.SQL.Add('  dp.lote,');
+    qSICFAR.SQL.Add('  LIST(DISTINCT d.desvio, '', '') AS desvios,');
+    qSICFAR.SQL.Add('  LIST(DISTINCT CAST(dp.desvio_id AS VARCHAR(20)), '','') AS desvios_ids');
+    qSICFAR.SQL.Add('FROM tbdesvio_produto dp');
+    qSICFAR.SQL.Add('JOIN tbdesvio d');
+    qSICFAR.SQL.Add('  ON d.desvio_id = dp.desvio_id');
+    qSICFAR.SQL.Add('WHERE dp.deletado = ''N''');
+    qSICFAR.SQL.Add('  AND d.deletado  = ''N''');
+    qSICFAR.SQL.Add('  AND dp.lote IS NOT NULL');
+
+//    qSICFAR.SQL.Add(' and dp.lote = ''24C12184E'' ');
+
+    qSICFAR.SQL.Add('GROUP BY dp.lote;');
+
+
+    // 2.1) Form de atividade
+    if not Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity := TForm_Activity.Create(Application);
+        Form_Activity.Show;
+        Form_Activity.Label_Status.Caption := 'Executando consulta no SICFAR...';
+        Application.ProcessMessages;
+      except
+        on E: Exception do
+        begin
+          if Assigned(Form_Activity) then
+            FreeAndNil(Form_Activity);
+          raise Exception.Create('Erro ao criar formulário de atividade: ' + E.Message);
+        end;
+      end;
+    end;
+
+    // 2.2) Abrir
+    qSICFAR.Open;
+
+    // 2.3) Contar total para feedback (usa subselect)
+    try
+      TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
+        'SELECT COUNT(*) FROM ( ' +
+        'SELECT dp.lote ' +
+        'FROM tbdesvio_produto dp ' +
+        'JOIN tbdesvio d ON d.desvio_id = dp.desvio_id ' +
+        'WHERE dp.deletado = ''N'' AND d.deletado = ''N'' AND dp.lote IS NOT NULL ' +
+//        ' AND dp.lote = ''24C12184E'' ' +
+        'GROUP BY dp.lote ' +
+        ') T'
+      );
+    except
+      // Se falhar a contagem, segue sem total
+      TotalRecords := -1;
+    end;
+
+    if Assigned(Form_Activity) then
+    begin
+      try
+        if TotalRecords >= 0 then
+          Form_Activity.Label_Status.Caption := Format('Preparando para atualizar... %d registros encontrados.', [TotalRecords])
+        else
+          Form_Activity.Label_Status.Caption := 'Preparando para atualizar...';
+        Application.ProcessMessages;
+      except
+        // Ignora erros na interface
+      end;
+    end;
+    Sleep(300);
+
+    try
+      // 5) Iterar registros SICFAR e atualizar TOTVS
+      qSICFAR.First;
+      CurrentRecord := 0;
+      while not qSICFAR.Eof do
+      begin
+        Inc(CurrentRecord);
+
+        if Assigned(Form_Activity) then
+        begin
+          try
+            if TotalRecords > 0 then
+              Form_Activity.Label_Status.Caption :=
+                Format('Atualizando registro %d de %d... Lote: %s', [CurrentRecord, TotalRecords, Trim(qSICFAR.FieldByName('lote').AsString)])
+            else
+              Form_Activity.Label_Status.Caption :=
+                'Atualizando... Lote: ' + Trim(qSICFAR.FieldByName('lote').AsString);
+            Application.ProcessMessages;
+          except
+            // Ignora erros na interface
+          end;
+        end;
+        // Extrair o primeiro ID de desvio da lista concatenada (desvios_ids)
+        ids := Trim(qSICFAR.FieldByName('desvios_ids').AsString);
+        firstId := ids;
+        posComma := Pos(',', firstId);
+
+        if posComma > 0 then
+          firstId := Copy(firstId, 1, posComma - 1);
+
+        // 3) Preparar UPDATE no TOTVS (parametrizado)
+        with qTOTVS do
+          begin
+              Close;
+              Connection := FDConnectionTOTVS;
+              SQL.Text :=
+              'UPDATE SD7010 ' +
+              'SET D7_YSICCQ = :pDesvioId ' +
+              'WHERE D_E_L_E_T_ = '''' ' +
+              '  AND D7_LOTECTL = :pLote';
+
+              ParamByName('pDesvioId').AsString := Copy(qSICFAR.FieldByName('desvios').AsString,1,10);
+              ParamByName('pLote').AsString     := qSICFAR.FieldByName('lote').AsString;
+
+              qTOTVS.ExecSQL;
+          end;
+
+        // Suavizar UI a cada 25 registros
+        if (CurrentRecord mod 25 = 0) then
+        begin
+          try
+            Application.ProcessMessages;
+          except
+          end;
+          Sleep(5);
+        end;
+
+        qSICFAR.Next;
+      end;
+
+      FDConnectionTOTVS.Commit;
+      CloseActivityForm;
+      ShowMessage('Importação de lotes para desvio concluída com sucesso.');
+    except
+      on E: Exception do
+      begin
+        if FDConnectionTOTVS.InTransaction then
+          FDConnectionTOTVS.Rollback;
+        CloseActivityForm;
+        raise;
+      end;
+    end;
+
+  except
+    on E: Exception do
+    begin
+      // Feedback de erro
+      if Assigned(Form_Activity) then
+        CloseActivityForm;
+      ShowMessage('Erro ao importar lotes para desvio: ' + E.Message);
+    end;
+  end;
+  finally
+    // Limpeza e reabilitação do botão
+    try
+      if qSICFAR.Active then qSICFAR.Close;
+    except
+      // ignora
+    end;
+    if Assigned(Ini) then Ini.Free;
+    btn_ImportarLoteDesvio.Enabled := True;
+  end;
+end;
+
 procedure TForm_Principal.btn_ImportarReceberClick(Sender: TObject);
 const
   FROM_JOIN_CLAUSE =
     'FROM SE1010 (NOLOCK) SE1 ' +
     'LEFT JOIN SA1010 (NOLOCK) SA1 ON SE1.E1_CLIENTE = SA1.A1_COD AND SE1.E1_LOJA = SA1.A1_LOJA AND SA1.D_E_L_E_T_ = '''' ';
 
-  WHERE_CLAUSE = 
+  WHERE_CLAUSE =
     ' WHERE SE1.D_E_L_E_T_ = '''' ' +
     ' AND ((SA1.A1_YENTREG = '''') OR (SA1.A1_YENTREG = ''N'')) ' +
     ' AND SE1.E1_VEND1 = ''000050'' ' +
     ' AND SE1.E1_TIPO NOT IN (''NCC'',''RA'') ' +
-    ' AND SE1.E1_SALDO > 0 ' +
+//    ' AND SE1.E1_SALDO > 0 ' +
     ' AND SE1.E1_SUSPENS <> ''S'' ';
     // Condições opcionais (comentadas):
     // ' AND DATEDIFF(DAY, CONVERT(DATETIME, SE1.E1_VENCREA, 112), GETDATE()) BETWEEN ''1'' AND ''99999'' ';
@@ -229,7 +443,7 @@ begin
   TotalRecords := FDConnectionTOTVS.ExecSQLScalar(
     'SELECT COUNT(*) ' + FROM_JOIN_CLAUSE + WHERE_CLAUSE
   );
-  
+
   if Assigned(Form_Activity) then
   begin
     try
@@ -254,7 +468,7 @@ begin
       while not qTOTVS.Eof do
       begin
         Inc(CurrentRecord);
-        
+
         if Assigned(Form_Activity) then
         begin
           try
@@ -302,7 +516,7 @@ begin
         qUp.ParamByName('processo').AsString           := qTOTVS.FieldByName('processo').AsString;
 
         qUp.ExecSQL;
-        
+
         // Controle de performance: atualiza interface a cada 10 registros
         if CurrentRecord mod 10 = 0 then
         begin
@@ -315,7 +529,7 @@ begin
           // Pausa de 10ms para melhor experiência visual e reduzir uso de CPU
           Sleep(10);
         end;
-        
+
         qTOTVS.Next;
       end;
 
@@ -345,7 +559,6 @@ end;
 
 procedure TForm_Principal.FormCreate(Sender: TObject);
 begin
-
  // Referencia de conexão: https://supabase.com/docs/guides/database/pgadmin
 //  libpq.dll compatível com a sua “bitness”
 //  {$IFDEF WIN64}

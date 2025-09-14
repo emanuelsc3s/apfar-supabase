@@ -9,7 +9,8 @@ uses
   FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Error, FireDAC.UI.Intf,
   FireDAC.Phys.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Stan.Async,
   FireDAC.Phys, FireDAC.Phys.MSSQL, FireDAC.Phys.MSSQLDef, FireDAC.VCLUI.Wait,
-  FireDAC.Comp.Client, FireDAC.Comp.DataSet, FireDAC.Phys.ODBCBase, Data.DB;
+  FireDAC.Comp.Client, FireDAC.Comp.DataSet, FireDAC.Phys.ODBCBase, Data.DB,
+  FireDAC.Phys.FB, FireDAC.Phys.FBDef;
 
 type
   TForm_ConfigSqlServer = class(TForm)
@@ -50,7 +51,7 @@ type
     { Private declarations }
   public
     { Public declarations }
-    procedure ConfigureAndConnectFDConnection(AIniFile: TIniFile; AFDConnection: TFDConnection);
+    procedure ConfigureAndConnectFDConnection(AIniFile: TIniFile; AFDConnection: TFDConnection; const ASectionName: string = 'Protheus');
   end;
 
 var
@@ -178,7 +179,7 @@ begin
   end;
 end;
 
-procedure TForm_ConfigSqlServer.ConfigureAndConnectFDConnection(AIniFile: TIniFile; AFDConnection: TFDConnection);
+procedure TForm_ConfigSqlServer.ConfigureAndConnectFDConnection(AIniFile: TIniFile; AFDConnection: TFDConnection; const ASectionName: string = 'Protheus');
 var
   sServer, sDatabase, sUsername, sPassword,
   sNetwork, sAddress, sWorkstation, sAppName, sVendorLib,
@@ -192,77 +193,139 @@ begin
     Exit;
   end;
 
-  // Ler todos os valores do INI primeiro
-  sServer           := AIniFile.ReadString('Protheus', 'Server', '');
-  sDatabase         := AIniFile.ReadString('Protheus', 'Database', '');
-  sUsername         := AIniFile.ReadString('Protheus', 'Username', '');
-  sPassword         := Biblioteca.MyCrypt('D', AIniFile.ReadString('Protheus', 'Password', ''));
-  sNetwork          := AIniFile.ReadString('Protheus', 'Network', '');
-  sAddress          := AIniFile.ReadString('Protheus', 'Address', '');
-  sWorkstation      := AIniFile.ReadString('Protheus', 'Workstation', '');
-  sAppName          := AIniFile.ReadString('Protheus', 'ApplicationName', '');
-  sVendorLib        := AIniFile.ReadString('Protheus', 'VendorLib', '');
-  sOSAuthent        := AIniFile.ReadString('Protheus', 'OSAuthent', 'False');
-  sMARS             := AIniFile.ReadString('Protheus', 'MARS', 'No');
-
-  // Driver e parâmetros básicos
-  AFDConnection.Params.Clear;
-  AFDConnection.DriverName := 'MSSQL';
-  AFDConnection.Params.Add('Server='   + sServer);
-  AFDConnection.Params.Add('Database=' + sDatabase);
-
-  // Autenticação integrada ou não
-  sOSAuthent := AIniFile.ReadString('Protheus', 'OSAuthent', 'False');
-
-  if SameText(sOSAuthent, 'Yes') then
-    OSAuthentValue := 'Yes'
-  else
-    OSAuthentValue := 'No';
-
-  AFDConnection.Params.Add('OSAuthent=' + OSAuthentValue);
-
-  // Se for SQL Auth, informe usuário e senha
-  if OSAuthentValue = 'No' then
+  if SameText(ASectionName, 'Protheus') then
   begin
-    AFDConnection.Params.Add('User_Name=' + sUsername);
-    AFDConnection.Params.Add('Password='  + sPassword);
-  end;
+    // Ler todos os valores do INI para SQL Server (TOTVS)
+    sServer           := AIniFile.ReadString(ASectionName, 'Server', '');
+    sDatabase         := AIniFile.ReadString(ASectionName, 'Database', '');
+    sUsername         := AIniFile.ReadString(ASectionName, 'Username', '');
+    sPassword         := Biblioteca.MyCrypt('D', AIniFile.ReadString(ASectionName, 'Password', ''));
+    sNetwork          := AIniFile.ReadString(ASectionName, 'Network', '');
+    sAddress          := AIniFile.ReadString(ASectionName, 'Address', '');
+    sWorkstation      := AIniFile.ReadString(ASectionName, 'Workstation', '');
+    sAppName          := AIniFile.ReadString(ASectionName, 'ApplicationName', '');
+    sVendorLib        := AIniFile.ReadString(ASectionName, 'VendorLib', '');
+    sOSAuthent        := AIniFile.ReadString(ASectionName, 'OSAuthent', 'False');
+    sMARS             := AIniFile.ReadString(ASectionName, 'MARS', 'No');
 
-  // MARS
-  if SameText(sMARS, 'Yes') then
-    MARSValue := 'Yes'
+    // Driver e parâmetros básicos
+    AFDConnection.Params.Clear;
+    AFDConnection.DriverName := 'MSSQL';
+    AFDConnection.Params.Add('Server='   + sServer);
+    AFDConnection.Params.Add('Database=' + sDatabase);
+
+    // Autenticação integrada ou não
+    if SameText(sOSAuthent, 'Yes') then
+      OSAuthentValue := 'Yes'
+    else
+      OSAuthentValue := 'No';
+
+    AFDConnection.Params.Add('OSAuthent=' + OSAuthentValue);
+
+    // Se for SQL Auth, informe usuário e senha
+    if OSAuthentValue = 'No' then
+    begin
+      AFDConnection.Params.Add('User_Name=' + sUsername);
+      AFDConnection.Params.Add('Password='  + sPassword);
+    end;
+
+    // MARS
+    if SameText(sMARS, 'Yes') then
+      MARSValue := 'Yes'
+    else
+      MARSValue := 'No';
+
+    AFDConnection.Params.Add('MARS=' + MARSValue);
+
+    // NetworkLibrary / Address
+    if SameText(Trim(sNetwork), 'TCP/IP') then
+      NetworkLibValue := 'DBMSSOCN'
+    else if SameText(Trim(sNetwork), 'Named Pipes') then
+      NetworkLibValue := 'DBNMPNTW'
+    else
+      NetworkLibValue := sNetwork;
+
+    AFDConnection.Params.Add('NetworkLibrary=' + NetworkLibValue);
+
+    if Trim(sAddress) <> '' then
+      AFDConnection.Params.Add('NetworkAddress=' + sAddress);
+
+    // WorkstationID, ApplicationName, VendorLib (se houver)
+    if Trim(sWorkstation) <> '' then
+      AFDConnection.Params.Add('WorkstationID=' + sWorkstation);
+    if Trim(sAppName) <> '' then
+      AFDConnection.Params.Add('ApplicationName=' + sAppName);
+    if Trim(sVendorLib) <> '' then
+      AFDConnection.Params.Add('VendorLib=' + sVendorLib);
+
+    // Conecta
+    try
+      AFDConnection.Connected := True;
+    except
+      on E: Exception do
+        ShowMessage('Falha ao conectar na TOTVS: ' + E.Message);
+    end;
+
+    Exit;
+  end
+  else if SameText(ASectionName, 'SICFAR') then
+  begin
+    // Firebird (SICFAR)
+    // Chaves do INI (pt-BR): Usuario->User_Name, Senha->Password, Porta->Port
+    AFDConnection.Params.Clear;
+    AFDConnection.DriverName := 'FB';
+
+    sServer    := AIniFile.ReadString(ASectionName, 'Server', '');
+    sDatabase  := AIniFile.ReadString(ASectionName, 'Database', '');
+    sUsername  := AIniFile.ReadString(ASectionName, 'Usuario',  '');
+    sPassword  := AIniFile.ReadString(ASectionName, 'Senha',    '');
+    sVendorLib := AIniFile.ReadString(ASectionName, 'VendorLib','');
+    sNetwork   := ''; // não usado no FB
+    sAddress   := '';
+    sWorkstation := '';
+    sAppName     := '';
+    sMARS        := '';
+
+    // Porta e Charset
+    sOSAuthent  := AIniFile.ReadString(ASectionName, 'Porta', ''); // usaremos como porta
+    sMARS       := AIniFile.ReadString(ASectionName, 'CharacterSet', '');
+
+    AFDConnection.Params.Add('DriverID=FB');
+    if sServer   <> '' then AFDConnection.Params.Add('Server='   + sServer);
+    if sDatabase <> '' then AFDConnection.Params.Add('Database=' + sDatabase);
+    if sUsername <> '' then AFDConnection.Params.Add('User_Name='+ sUsername);
+    if sPassword <> '' then AFDConnection.Params.Add('Password=' + sPassword);
+    if sOSAuthent<> '' then AFDConnection.Params.Add('Port='     + sOSAuthent);
+    if sMARS     <> '' then AFDConnection.Params.Add('CharacterSet=' + sMARS);
+    if sVendorLib<> '' then AFDConnection.Params.Add('VendorLib=' + sVendorLib);
+
+    AFDConnection.LoginPrompt := False;
+
+    try
+      AFDConnection.Connected := True;
+    except
+      on E: Exception do
+        ShowMessage('Falha ao conectar no SICFAR (Firebird): ' + E.Message);
+    end;
+
+    Exit;
+  end
   else
-    MARSValue := 'No';
-
-  AFDConnection.Params.Add('MARS=' + MARSValue);
-
-  // NetworkLibrary / Address
-  if SameText(Trim(sNetwork), 'TCP/IP') then
-    NetworkLibValue := 'DBMSSOCN'
-  else if SameText(Trim(sNetwork), 'Named Pipes') then
-    NetworkLibValue := 'DBNMPNTW'
-  else
-    NetworkLibValue := sNetwork;
-
-  AFDConnection.Params.Add('NetworkLibrary=' + NetworkLibValue);
-
-  if Trim(sAddress) <> '' then
-    AFDConnection.Params.Add('NetworkAddress=' + sAddress);
-
-  // WorkstationID, ApplicationName, VendorLib (se houver)
-  if Trim(sWorkstation) <> '' then
-    AFDConnection.Params.Add('WorkstationID=' + sWorkstation);
-  if Trim(sAppName) <> '' then
-    AFDConnection.Params.Add('ApplicationName=' + sAppName);
-  if Trim(sVendorLib) <> '' then
-    AFDConnection.Params.Add('VendorLib=' + sVendorLib);
-
-  // Conecta
-  try
-    AFDConnection.Connected := True;
-  except
-    on E: Exception do
-      ShowMessage('Falha ao conectar na TOTVS: ' + E.Message);
+  begin
+    // Seção desconhecida: tentar detectar pelo DriverID
+    sVendorLib := AIniFile.ReadString(ASectionName, 'DriverID', '');
+    if SameText(sVendorLib, 'FB') then
+    begin
+      // Reaproveita caminho SICFAR
+      ConfigureAndConnectFDConnection(AIniFile, AFDConnection, 'SICFAR');
+      Exit;
+    end
+    else
+    begin
+      // Padrão: Protheus
+      ConfigureAndConnectFDConnection(AIniFile, AFDConnection, 'Protheus');
+      Exit;
+    end;
   end;
 end;
 
