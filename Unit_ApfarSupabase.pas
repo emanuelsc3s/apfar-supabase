@@ -248,7 +248,7 @@ begin
   qSICFAR.SQL.Add('  MODALIDADE_ANO,');
   qSICFAR.SQL.Add('  OBJETO_ID,');
   qSICFAR.SQL.Add('  DATA_INC,');
-  qSICFAR.SQL.Add('  USUARIO_I,');
+  qSICFAR.SQL.Add('  USUARIO_ID,');
   qSICFAR.SQL.Add('  DATA_ALT,');
   qSICFAR.SQL.Add('  USUARIO_A,');
   qSICFAR.SQL.Add('  DATA_DEL,');
@@ -364,7 +364,7 @@ begin
         qUp.ParamByName('objeto_id').AsInteger := qSICFAR.FieldByName('OBJETO_ID').AsInteger;
 
         SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
-        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_I').AsInteger;
+        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_ID').AsInteger;
         SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
         qUp.ParamByName('usuario_a').AsInteger := qSICFAR.FieldByName('USUARIO_A').AsInteger;
         SetTimestampParam('data_del', qSICFAR.FieldByName('DATA_DEL'));
@@ -939,7 +939,7 @@ procedure TForm_Principal.btn_ClienteClick(Sender: TObject);
 const
   // WHERE_CLAUSE pode ser ajustado conforme necessidade para filtrar registros específicos
   WHERE_CLAUSE =
-    ' WHERE deletado = ''N'' AND pessoa_id > 0';
+    ' WHERE pessoa_id > 0';
 
   SQL_UPSERT =
     'INSERT INTO public.tbcliente (' +
@@ -1160,7 +1160,7 @@ begin
   qSICFAR.SQL.Add('  CNH_VENCIMENTO,');
   qSICFAR.SQL.Add('  RG_EMISSAO,');
   qSICFAR.SQL.Add('  DATA_INC,');
-  qSICFAR.SQL.Add('  USUARIO_I,');
+  qSICFAR.SQL.Add('  USUARIO_ID,');
   qSICFAR.SQL.Add('  DATA_ALT,');
   qSICFAR.SQL.Add('  USUARIO_A,');
   qSICFAR.SQL.Add('  DATA_DEL,');
@@ -1290,7 +1290,7 @@ begin
         qUp.ParamByName('natural_id').AsInteger := qSICFAR.FieldByName('NATURAL_ID').AsInteger;
         qUp.ParamByName('nacionalidade').AsString := qSICFAR.FieldByName('NACIONALIDADE').AsString;
         qUp.ParamByName('regime_casamento').AsString := qSICFAR.FieldByName('REGIME_CASAMENTO').AsString;
-        qUp.ParamByName('renda_conjuge').AsFloat := qSICFAR.FieldByName('RENDACONJUGE').AsFloat;
+        qUp.ParamByName('renda_conjuge').AsFloat := qSICFAR.FieldByName('RENDA_CONJUGE').AsFloat;
         qUp.ParamByName('nacionalidade_conjuge').AsString := qSICFAR.FieldByName('NACIONALIDADE_CONJUGE').AsString;
         qUp.ParamByName('profissao_conjuge').AsString := qSICFAR.FieldByName('PROFISSAO_CONJUGE').AsString;
         qUp.ParamByName('numero').AsInteger := qSICFAR.FieldByName('NUMERO').AsInteger;
@@ -1315,7 +1315,7 @@ begin
         SetDateParam('rg_emissao', qSICFAR.FieldByName('RG_EMISSAO'));
 
         SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
-        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_I').AsInteger;
+        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_ID').AsInteger;
         SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
         qUp.ParamByName('usuario_a').AsInteger := qSICFAR.FieldByName('USUARIO_A').AsInteger;
         SetTimestampParam('data_del', qSICFAR.FieldByName('DATA_DEL'));
