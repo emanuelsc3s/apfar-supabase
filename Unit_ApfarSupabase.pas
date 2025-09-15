@@ -31,12 +31,14 @@ type
     FDConnectionSICFAR: TFDConnection;
     qSICFAR: TFDQuery;
     FBDriverLink: TFDPhysFBDriverLink;
+    btn_Cliente: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
     procedure btn_FecharClick(Sender: TObject);
     procedure btn_ImportarLoteDesvioClick(Sender: TObject);
     procedure btn_ImportarLicitacaoClick(Sender: TObject);
+    procedure btn_ClienteClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -931,6 +933,512 @@ begin
   finally
     qUp.Free;
   end;
+end;
+
+procedure TForm_Principal.btn_ClienteClick(Sender: TObject);
+const
+  // WHERE_CLAUSE pode ser ajustado conforme necessidade para filtrar registros específicos
+  WHERE_CLAUSE =
+    ' WHERE deletado = ''N'' AND pessoa_id > 0';
+
+  SQL_UPSERT =
+    'INSERT INTO public.tbcliente (' +
+    '  cliente_id, empresa_id, nome_pupular, nome, endereco, complemento,' +
+    '  bairro, cidade_id, uf, cep, vendedor_id, naturalidade, nascimento,' +
+    '  sexo, tipo, cpf_cnpj, rg_cgf, estcivil, obs, pai, mae,' +
+    '  limite_credito, conjuge, comissao, situacao, deletado, email, site,' +
+    '  cpf_conjuge, rg_conjuge, rg_orgao, rg_uf, rg_orgao_conjuge, rg_uf_conjuge,' +
+    '  profissao, natural_id, nacionalidade, regime_casamento, renda_conjuge,' +
+    '  nacionalidade_conjuge, profissao_conjuge, numero, suframa, pais_id,' +
+    '  data_batismo, cargo_id, funcao_id, grupo_id, subgrupo_id,' +
+    '  nascimento_conjuge, dia_vencimento, cnh, cnh_categoria,' +
+    '  cnh_emissao, cnh_vencimento, rg_emissao, data_inc, usuario_i,' +
+    '  data_alt, usuario_a, data_del, usuario_d, erp_codigo, ctps_n,' +
+    '  ctps_s, ctps_uf, nit, ctps_emissao, cnh_uf, data_admissao,' +
+    '  titulo_numero, titulo_zona, titulo_secao, banco_id, banco,' +
+    '  agencia, conta, cor, grau_instrucao, bloqueio_id, setor_id,' +
+    '  sync, sync_data, cidade' +
+    ') VALUES (' +
+    '  :cliente_id, :empresa_id, :nome_pupular, :nome, :endereco, :complemento,' +
+    '  :bairro, :cidade_id, :uf, :cep, :vendedor_id, :naturalidade, :nascimento,' +
+    '  :sexo, :tipo, :cpf_cnpj, :rg_cgf, :estcivil, :obs, :pai, :mae,' +
+    '  :limite_credito, :conjuge, :comissao, :situacao, :deletado, :email, :site,' +
+    '  :cpf_conjuge, :rg_conjuge, :rg_orgao, :rg_uf, :rg_orgao_conjuge, :rg_uf_conjuge,' +
+    '  :profissao, :natural_id, :nacionalidade, :regime_casamento, :renda_conjuge,' +
+    '  :nacionalidade_conjuge, :profissao_conjuge, :numero, :suframa, :pais_id,' +
+    '  :data_batismo, :cargo_id, :funcao_id, :grupo_id, :subgrupo_id,' +
+    '  :nascimento_conjuge, :dia_vencimento, :cnh, :cnh_categoria,' +
+    '  :cnh_emissao, :cnh_vencimento, :rg_emissao, :data_inc, :usuario_i,' +
+    '  :data_alt, :usuario_a, :data_del, :usuario_d, :erp_codigo, :ctps_n,' +
+    '  :ctps_s, :ctps_uf, :nit, :ctps_emissao, :cnh_uf, :data_admissao,' +
+    '  :titulo_numero, :titulo_zona, :titulo_secao, :banco_id, :banco,' +
+    '  :agencia, :conta, :cor, :grau_instrucao, :bloqueio_id, :setor_id,' +
+    '  :sync, (now() at time zone ''America/Sao_Paulo''), :cidade' +
+    ') ON CONFLICT (cliente_id) DO UPDATE SET ' +
+    '  empresa_id=EXCLUDED.empresa_id, nome_pupular=EXCLUDED.nome_pupular,' +
+    '  nome=EXCLUDED.nome, endereco=EXCLUDED.endereco, complemento=EXCLUDED.complemento,' +
+    '  bairro=EXCLUDED.bairro, cidade_id=EXCLUDED.cidade_id, uf=EXCLUDED.uf,' +
+    '  cep=EXCLUDED.cep, vendedor_id=EXCLUDED.vendedor_id, naturalidade=EXCLUDED.naturalidade,' +
+    '  nascimento=EXCLUDED.nascimento, sexo=EXCLUDED.sexo, tipo=EXCLUDED.tipo,' +
+    '  cpf_cnpj=EXCLUDED.cpf_cnpj, rg_cgf=EXCLUDED.rg_cgf, estcivil=EXCLUDED.estcivil,' +
+    '  obs=EXCLUDED.obs, pai=EXCLUDED.pai, mae=EXCLUDED.mae,' +
+    '  limite_credito=EXCLUDED.limite_credito, conjuge=EXCLUDED.conjuge,' +
+    '  comissao=EXCLUDED.comissao, situacao=EXCLUDED.situacao, deletado=EXCLUDED.deletado,' +
+    '  email=EXCLUDED.email, site=EXCLUDED.site, cpf_conjuge=EXCLUDED.cpf_conjuge,' +
+    '  rg_conjuge=EXCLUDED.rg_conjuge, rg_orgao=EXCLUDED.rg_orgao, rg_uf=EXCLUDED.rg_uf,' +
+    '  rg_orgao_conjuge=EXCLUDED.rg_orgao_conjuge, rg_uf_conjuge=EXCLUDED.rg_uf_conjuge,' +
+    '  profissao=EXCLUDED.profissao, natural_id=EXCLUDED.natural_id,' +
+    '  nacionalidade=EXCLUDED.nacionalidade, regime_casamento=EXCLUDED.regime_casamento,' +
+    '  renda_conjuge=EXCLUDED.renda_conjuge, nacionalidade_conjuge=EXCLUDED.nacionalidade_conjuge,' +
+    '  profissao_conjuge=EXCLUDED.profissao_conjuge, numero=EXCLUDED.numero,' +
+    '  suframa=EXCLUDED.suframa, pais_id=EXCLUDED.pais_id,' +
+    '  data_batismo=EXCLUDED.data_batismo, cargo_id=EXCLUDED.cargo_id,' +
+    '  funcao_id=EXCLUDED.funcao_id, grupo_id=EXCLUDED.grupo_id, subgrupo_id=EXCLUDED.subgrupo_id,' +
+    '  nascimento_conjuge=EXCLUDED.nascimento_conjuge, dia_vencimento=EXCLUDED.dia_vencimento,' +
+    '  cnh=EXCLUDED.cnh, cnh_categoria=EXCLUDED.cnh_categoria,' +
+    '  cnh_emissao=EXCLUDED.cnh_emissao, cnh_vencimento=EXCLUDED.cnh_vencimento,' +
+    '  rg_emissao=EXCLUDED.rg_emissao, data_inc=EXCLUDED.data_inc, usuario_i=EXCLUDED.usuario_i,' +
+    '  data_alt=EXCLUDED.data_alt, usuario_a=EXCLUDED.usuario_a, data_del=EXCLUDED.data_del,' +
+    '  usuario_d=EXCLUDED.usuario_d, erp_codigo=EXCLUDED.erp_codigo, ctps_n=EXCLUDED.ctps_n,' +
+    '  ctps_s=EXCLUDED.ctps_s, ctps_uf=EXCLUDED.ctps_uf, nit=EXCLUDED.nit,' +
+    '  ctps_emissao=EXCLUDED.ctps_emissao, cnh_uf=EXCLUDED.cnh_uf,' +
+    '  data_admissao=EXCLUDED.data_admissao, titulo_numero=EXCLUDED.titulo_numero,' +
+    '  titulo_zona=EXCLUDED.titulo_zona, titulo_secao=EXCLUDED.titulo_secao,' +
+    '  banco_id=EXCLUDED.banco_id, banco=EXCLUDED.banco, agencia=EXCLUDED.agencia,' +
+    '  conta=EXCLUDED.conta, cor=EXCLUDED.cor, grau_instrucao=EXCLUDED.grau_instrucao,' +
+    '  bloqueio_id=EXCLUDED.bloqueio_id, setor_id=EXCLUDED.setor_id,' +
+    '  sync=EXCLUDED.sync, sync_data=(now() at time zone ''America/Sao_Paulo''),' +
+    '  cidade=EXCLUDED.cidade';
+
+var
+  qUp: TFDQuery;
+  fs: TFormatSettings;
+  Ini: TIniFile;
+  TotalRecords, CurrentRecord: Integer;
+
+  procedure CloseActivityForm;
+  begin
+    if Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity.Close;
+      except
+        // Ignora erros de fechamento
+      end;
+      try
+        FreeAndNil(Form_Activity);
+      except
+        // Ignora erros de liberação
+      end;
+    end;
+  end;
+
+  procedure SetDateParam(const PName: string; F: TField);
+  var s: string; d: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDate;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType = ftDate then
+        qUp.ParamByName(PName).AsDate := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDate(s, d, fs) then
+          qUp.ParamByName(PName).AsDate := d
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
+    end;
+  end;
+
+  procedure SetTimestampParam(const PName: string; F: TField);
+  var s: string; dt: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDateTime;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType in [ftDateTime, ftTimeStamp] then
+        qUp.ParamByName(PName).AsDateTime := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDateTime(s, dt, fs) then
+          qUp.ParamByName(PName).AsDateTime := dt
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
+    end;
+  end;
+
+begin
+  // formato para parse dd/MM/yyyy (somente se o SQL retornar texto)
+  fs := TFormatSettings.Create;
+  fs.DateSeparator   := '/';
+  fs.ShortDateFormat := 'dd/MM/yyyy';
+  fs.TimeSeparator   := ':';
+  fs.ShortTimeFormat := 'hh:nn:ss';
+
+  FDConnectionSupabase.Connected := True;
+
+  // 1) Configurar conexão SICFAR (Firebird)
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
+  finally
+    Ini.Free;
+  end;
+
+  // 2) Preparar consulta no SICFAR usando o componente qSICFAR do formulário
+  qSICFAR.Close;
+  qSICFAR.Connection := FDConnectionSICFAR;
+  qSICFAR.SQL.Clear;
+  qSICFAR.SQL.Add('SELECT');
+  qSICFAR.SQL.Add('  PESSOA_ID,');
+  qSICFAR.SQL.Add('  EMPRESA_ID,');
+  qSICFAR.SQL.Add('  NOME_PUPULAR,');
+  qSICFAR.SQL.Add('  NOME,');
+  qSICFAR.SQL.Add('  ENDERECO,');
+  qSICFAR.SQL.Add('  COMPLEMENTO,');
+  qSICFAR.SQL.Add('  BAIRRO,');
+  qSICFAR.SQL.Add('  CIDADE_ID,');
+  qSICFAR.SQL.Add('  CIDADE,');
+  qSICFAR.SQL.Add('  UF,');
+  qSICFAR.SQL.Add('  CEP,');
+  qSICFAR.SQL.Add('  PESSOA_VR,');
+  qSICFAR.SQL.Add('  NATURALIDADE,');
+  qSICFAR.SQL.Add('  NASCIMENTO,');
+  qSICFAR.SQL.Add('  SEXO,');
+  qSICFAR.SQL.Add('  TIPO,');
+  qSICFAR.SQL.Add('  CPF_CNPJ,');
+  qSICFAR.SQL.Add('  RG_CGF,');
+  qSICFAR.SQL.Add('  ESTCIVIL,');
+  qSICFAR.SQL.Add('  OBS,');
+  qSICFAR.SQL.Add('  PAI,');
+  qSICFAR.SQL.Add('  MAE,');
+  qSICFAR.SQL.Add('  LIMITE_CREDITO,');
+  qSICFAR.SQL.Add('  CONJUGE,');
+  qSICFAR.SQL.Add('  COMISSAO,');
+  qSICFAR.SQL.Add('  SITUACAO,');
+  qSICFAR.SQL.Add('  DELETADO,');
+  qSICFAR.SQL.Add('  EMAIL,');
+  qSICFAR.SQL.Add('  SITE,');
+  qSICFAR.SQL.Add('  CPF_CONJUGE,');
+  qSICFAR.SQL.Add('  RG_CONJUGE,');
+  qSICFAR.SQL.Add('  RG_ORGAO,');
+  qSICFAR.SQL.Add('  RG_UF,');
+  qSICFAR.SQL.Add('  RG_ORGAO_CONJUGE,');
+  qSICFAR.SQL.Add('  RG_UF_CONJUGE,');
+  qSICFAR.SQL.Add('  PROFISSAO,');
+  qSICFAR.SQL.Add('  NATURAL_ID,');
+  qSICFAR.SQL.Add('  NACIONALIDADE,');
+  qSICFAR.SQL.Add('  REGIME_CASAMENTO,');
+  qSICFAR.SQL.Add('  RENDA_CONJUGE,');
+  qSICFAR.SQL.Add('  NACIONALIDADE_CONJUGE,');
+  qSICFAR.SQL.Add('  PROFISSAO_CONJUGE,');
+  qSICFAR.SQL.Add('  NUMERO,');
+  qSICFAR.SQL.Add('  SUFRAMA,');
+  qSICFAR.SQL.Add('  PAIS_ID,');
+  qSICFAR.SQL.Add('  DATA_BATISMO,');
+  qSICFAR.SQL.Add('  CARGO_ID,');
+  qSICFAR.SQL.Add('  FUNCAO_ID,');
+  qSICFAR.SQL.Add('  GRUPO_ID,');
+  qSICFAR.SQL.Add('  SUBGRUPO_ID,');
+  qSICFAR.SQL.Add('  NASCIMENTO_CONJUGE,');
+  qSICFAR.SQL.Add('  DIA_VENCIMENTO,');
+  qSICFAR.SQL.Add('  CNH,');
+  qSICFAR.SQL.Add('  CNH_CATEGORIA,');
+  qSICFAR.SQL.Add('  CNH_EMISSAO,');
+  qSICFAR.SQL.Add('  CNH_VENCIMENTO,');
+  qSICFAR.SQL.Add('  RG_EMISSAO,');
+  qSICFAR.SQL.Add('  DATA_INC,');
+  qSICFAR.SQL.Add('  USUARIO_I,');
+  qSICFAR.SQL.Add('  DATA_ALT,');
+  qSICFAR.SQL.Add('  USUARIO_A,');
+  qSICFAR.SQL.Add('  DATA_DEL,');
+  qSICFAR.SQL.Add('  USUARIO_D,');
+  qSICFAR.SQL.Add('  ERP_CODIGO,');
+  qSICFAR.SQL.Add('  CTPS_N,');
+  qSICFAR.SQL.Add('  CTPS_S,');
+  qSICFAR.SQL.Add('  CTPS_UF,');
+  qSICFAR.SQL.Add('  NIT,');
+  qSICFAR.SQL.Add('  CTPS_EMISSAO,');
+  qSICFAR.SQL.Add('  CNH_UF,');
+  qSICFAR.SQL.Add('  DATA_ADMISSAO,');
+  qSICFAR.SQL.Add('  TITULO_NUMERO,');
+  qSICFAR.SQL.Add('  TITULO_ZONA,');
+  qSICFAR.SQL.Add('  TITULO_SECAO,');
+  qSICFAR.SQL.Add('  BANCO_ID,');
+  qSICFAR.SQL.Add('  BANCO,');
+  qSICFAR.SQL.Add('  AGENCIA,');
+  qSICFAR.SQL.Add('  CONTA,');
+  qSICFAR.SQL.Add('  COR,');
+  qSICFAR.SQL.Add('  GRAU_INSTRUCAO,');
+  qSICFAR.SQL.Add('  BLOQUEIO_ID,');
+  qSICFAR.SQL.Add('  SETOR_ID,');
+  qSICFAR.SQL.Add('  SYNC');
+  qSICFAR.SQL.Add('FROM TBPESSOAS');
+  qSICFAR.SQL.Add(WHERE_CLAUSE);
+  qSICFAR.SQL.Add('ORDER BY PESSOA_ID');
+
+  // Exibir Form de Atividade e contar registros
+  if not Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity := TForm_Activity.Create(Application);
+      Form_Activity.Show;
+      Form_Activity.Label_Status.Caption := 'Executando consulta...';
+      Application.ProcessMessages;
+    except
+      on E: Exception do
+      begin
+        if Assigned(Form_Activity) then
+          FreeAndNil(Form_Activity);
+        raise Exception.Create('Erro ao criar formulário de atividade: ' + E.Message);
+      end;
+    end;
+  end;
+
+  qSICFAR.Open;
+
+  TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
+    'SELECT COUNT(*) FROM TBPESSOAS' + WHERE_CLAUSE
+  );
+
+  if Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords]);
+      Application.ProcessMessages;
+    except
+      // Ignora erros na interface
+    end;
+  end;
+  Sleep(500);
+
+  // 3) Prepara o UPSERT no Supabase
+  qUp := TFDQuery.Create(nil);
+  try
+    qUp.Connection := FDConnectionSupabase;
+    qUp.SQL.Text   := SQL_UPSERT;
+
+    FDConnectionSupabase.StartTransaction;
+    try
+      qSICFAR.First;
+      CurrentRecord := 0;
+      while not qSICFAR.Eof do
+      begin
+        Inc(CurrentRecord);
+
+        if Assigned(Form_Activity) then
+        begin
+          try
+            Form_Activity.Label_Status.Caption := Format('Importando registro %d de %d...', [CurrentRecord, TotalRecords]);
+            Application.ProcessMessages;
+          except
+            // Ignora erros na interface
+          end;
+        end;
+
+        // Mapeamento de parâmetros Firebird → Supabase
+        qUp.ParamByName('cliente_id').AsInteger := qSICFAR.FieldByName('PESSOA_ID').AsInteger;
+        qUp.ParamByName('empresa_id').AsInteger := qSICFAR.FieldByName('EMPRESA_ID').AsInteger;
+        qUp.ParamByName('nome_pupular').AsString := qSICFAR.FieldByName('NOME_PUPULAR').AsString;
+        qUp.ParamByName('nome').AsString := qSICFAR.FieldByName('NOME').AsString;
+        qUp.ParamByName('endereco').AsString := qSICFAR.FieldByName('ENDERECO').AsString;
+        qUp.ParamByName('complemento').AsString := qSICFAR.FieldByName('COMPLEMENTO').AsString;
+        qUp.ParamByName('bairro').AsString := qSICFAR.FieldByName('BAIRRO').AsString;
+        qUp.ParamByName('cidade_id').AsInteger := qSICFAR.FieldByName('CIDADE_ID').AsInteger;
+        qUp.ParamByName('cidade').AsString := qSICFAR.FieldByName('CIDADE').AsString;
+        qUp.ParamByName('uf').AsString := qSICFAR.FieldByName('UF').AsString;
+        qUp.ParamByName('cep').AsString := qSICFAR.FieldByName('CEP').AsString;
+        qUp.ParamByName('vendedor_id').AsInteger := qSICFAR.FieldByName('PESSOA_VR').AsInteger;
+        qUp.ParamByName('naturalidade').AsString := qSICFAR.FieldByName('NATURALIDADE').AsString;
+
+        SetDateParam('nascimento', qSICFAR.FieldByName('NASCIMENTO'));
+
+        qUp.ParamByName('sexo').AsString := qSICFAR.FieldByName('SEXO').AsString;
+        qUp.ParamByName('tipo').AsString := qSICFAR.FieldByName('TIPO').AsString;
+        qUp.ParamByName('cpf_cnpj').AsString := qSICFAR.FieldByName('CPF_CNPJ').AsString;
+        qUp.ParamByName('rg_cgf').AsString := qSICFAR.FieldByName('RG_CGF').AsString;
+        qUp.ParamByName('estcivil').AsString := qSICFAR.FieldByName('ESTCIVIL').AsString;
+        qUp.ParamByName('obs').AsString := qSICFAR.FieldByName('OBS').AsString;
+        qUp.ParamByName('pai').AsString := qSICFAR.FieldByName('PAI').AsString;
+        qUp.ParamByName('mae').AsString := qSICFAR.FieldByName('MAE').AsString;
+        qUp.ParamByName('limite_credito').AsFloat := qSICFAR.FieldByName('LIMITE_CREDITO').AsFloat;
+        qUp.ParamByName('conjuge').AsString := qSICFAR.FieldByName('CONJUGE').AsString;
+        qUp.ParamByName('comissao').AsFloat := qSICFAR.FieldByName('COMISSAO').AsFloat;
+        qUp.ParamByName('situacao').AsString := qSICFAR.FieldByName('SITUACAO').AsString;
+        qUp.ParamByName('deletado').AsString := qSICFAR.FieldByName('DELETADO').AsString;
+        qUp.ParamByName('email').AsString := qSICFAR.FieldByName('EMAIL').AsString;
+        qUp.ParamByName('site').AsString := qSICFAR.FieldByName('SITE').AsString;
+        qUp.ParamByName('cpf_conjuge').AsString := qSICFAR.FieldByName('CPF_CONJUGE').AsString;
+        qUp.ParamByName('rg_conjuge').AsString := qSICFAR.FieldByName('RG_CONJUGE').AsString;
+        qUp.ParamByName('rg_orgao').AsString := qSICFAR.FieldByName('RG_ORGAO').AsString;
+        qUp.ParamByName('rg_uf').AsString := qSICFAR.FieldByName('RG_UF').AsString;
+        qUp.ParamByName('rg_orgao_conjuge').AsString := qSICFAR.FieldByName('RG_ORGAO_CONJUGE').AsString;
+        qUp.ParamByName('rg_uf_conjuge').AsString := qSICFAR.FieldByName('RG_UF_CONJUGE').AsString;
+        qUp.ParamByName('profissao').AsString := qSICFAR.FieldByName('PROFISSAO').AsString;
+        qUp.ParamByName('natural_id').AsInteger := qSICFAR.FieldByName('NATURAL_ID').AsInteger;
+        qUp.ParamByName('nacionalidade').AsString := qSICFAR.FieldByName('NACIONALIDADE').AsString;
+        qUp.ParamByName('regime_casamento').AsString := qSICFAR.FieldByName('REGIME_CASAMENTO').AsString;
+        qUp.ParamByName('renda_conjuge').AsFloat := qSICFAR.FieldByName('RENDACONJUGE').AsFloat;
+        qUp.ParamByName('nacionalidade_conjuge').AsString := qSICFAR.FieldByName('NACIONALIDADE_CONJUGE').AsString;
+        qUp.ParamByName('profissao_conjuge').AsString := qSICFAR.FieldByName('PROFISSAO_CONJUGE').AsString;
+        qUp.ParamByName('numero').AsInteger := qSICFAR.FieldByName('NUMERO').AsInteger;
+        qUp.ParamByName('suframa').AsString := qSICFAR.FieldByName('SUFRAMA').AsString;
+        qUp.ParamByName('pais_id').AsInteger := qSICFAR.FieldByName('PAIS_ID').AsInteger;
+
+        SetDateParam('data_batismo', qSICFAR.FieldByName('DATA_BATISMO'));
+
+        qUp.ParamByName('cargo_id').AsInteger := qSICFAR.FieldByName('CARGO_ID').AsInteger;
+        qUp.ParamByName('funcao_id').AsInteger := qSICFAR.FieldByName('FUNCAO_ID').AsInteger;
+        qUp.ParamByName('grupo_id').AsInteger := qSICFAR.FieldByName('GRUPO_ID').AsInteger;
+        qUp.ParamByName('subgrupo_id').AsInteger := qSICFAR.FieldByName('SUBGRUPO_ID').AsInteger;
+
+        SetDateParam('nascimento_conjuge', qSICFAR.FieldByName('NASCIMENTO_CONJUGE'));
+
+        qUp.ParamByName('dia_vencimento').AsInteger := qSICFAR.FieldByName('DIA_VENCIMENTO').AsInteger;
+        qUp.ParamByName('cnh').AsString := qSICFAR.FieldByName('CNH').AsString;
+        qUp.ParamByName('cnh_categoria').AsString := qSICFAR.FieldByName('CNH_CATEGORIA').AsString;
+
+        SetDateParam('cnh_emissao', qSICFAR.FieldByName('CNH_EMISSAO'));
+        SetDateParam('cnh_vencimento', qSICFAR.FieldByName('CNH_VENCIMENTO'));
+        SetDateParam('rg_emissao', qSICFAR.FieldByName('RG_EMISSAO'));
+
+        SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
+        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_I').AsInteger;
+        SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
+        qUp.ParamByName('usuario_a').AsInteger := qSICFAR.FieldByName('USUARIO_A').AsInteger;
+        SetTimestampParam('data_del', qSICFAR.FieldByName('DATA_DEL'));
+        qUp.ParamByName('usuario_d').AsInteger := qSICFAR.FieldByName('USUARIO_D').AsInteger;
+
+        qUp.ParamByName('erp_codigo').AsString := qSICFAR.FieldByName('ERP_CODIGO').AsString;
+        qUp.ParamByName('ctps_n').AsString := qSICFAR.FieldByName('CTPS_N').AsString;
+        qUp.ParamByName('ctps_s').AsString := qSICFAR.FieldByName('CTPS_S').AsString;
+        qUp.ParamByName('ctps_uf').AsString := qSICFAR.FieldByName('CTPS_UF').AsString;
+        qUp.ParamByName('nit').AsString := qSICFAR.FieldByName('NIT').AsString;
+
+        SetDateParam('ctps_emissao', qSICFAR.FieldByName('CTPS_EMISSAO'));
+
+        qUp.ParamByName('cnh_uf').AsString := qSICFAR.FieldByName('CNH_UF').AsString;
+
+        SetDateParam('data_admissao', qSICFAR.FieldByName('DATA_ADMISSAO'));
+
+        qUp.ParamByName('titulo_numero').AsString := qSICFAR.FieldByName('TITULO_NUMERO').AsString;
+        qUp.ParamByName('titulo_zona').AsString := qSICFAR.FieldByName('TITULO_ZONA').AsString;
+        qUp.ParamByName('titulo_secao').AsString := qSICFAR.FieldByName('TITULO_SECAO').AsString;
+        qUp.ParamByName('banco_id').AsInteger := qSICFAR.FieldByName('BANCO_ID').AsInteger;
+        qUp.ParamByName('banco').AsString := qSICFAR.FieldByName('BANCO').AsString;
+        qUp.ParamByName('agencia').AsString := qSICFAR.FieldByName('AGENCIA').AsString;
+        qUp.ParamByName('conta').AsString := qSICFAR.FieldByName('CONTA').AsString;
+        qUp.ParamByName('cor').AsString := qSICFAR.FieldByName('COR').AsString;
+        qUp.ParamByName('grau_instrucao').AsString := qSICFAR.FieldByName('GRAU_INSTRUCAO').AsString;
+        qUp.ParamByName('bloqueio_id').AsInteger := qSICFAR.FieldByName('BLOQUEIO_ID').AsInteger;
+        qUp.ParamByName('setor_id').AsInteger := qSICFAR.FieldByName('SETOR_ID').AsInteger;
+        qUp.ParamByName('sync').AsString := qSICFAR.FieldByName('SYNC').AsString;
+
+        qUp.ExecSQL;
+
+        // Controle de performance: atualiza interface a cada 10 registros
+        if CurrentRecord mod 10 = 0 then
+        begin
+          try
+            Application.ProcessMessages;
+          except
+            // Ignora erros no ProcessMessages
+          end;
+          Sleep(10);
+        end;
+
+        qSICFAR.Next;
+      end;
+
+      FDConnectionSupabase.Commit;
+      CloseActivityForm;
+      ShowMessage('Importação de clientes concluída com sucesso.');
+    except
+      on E: Exception do
+      begin
+        FDConnectionSupabase.Rollback;
+        CloseActivityForm;
+        raise;
+      end;
+    end;
+  finally
+    qUp.Free;
+    if qSICFAR.Active then qSICFAR.Close;
+    if FDConnectionSICFAR.Connected then FDConnectionSICFAR.Connected := False;
+  end;
+
+  {
+    **************************************************************************
+    * CAMPOS FIREBIRD (TBPESSOAS) NÃO MAPEADOS PARA SUPABASE (TBCLIENTE)       *
+    *                                                                        *
+    * Campos abaixo existem no Firebird mas não têm correspondência na         *
+    * tabela tbcliente do Supabase. Foram intencionalmente ignorados nesta    *
+    * implementação. Consulte docs/campos-nao-mapeados-tbcliente.md para      *
+    * documentação completa e sugestões de implementação futura.            *
+    **************************************************************************
+    
+    // Endereços Adicionais
+    // ENT_NOME, ENT_ENDERECO, ENT_BAIRRO, ENT_CIDADE, ENT_UF, ENT_FONE
+    
+    // Telefones Múltiplos
+    // FONE_01, FONE_02, FONE_03, FONE_04, WHATSAPP
+    
+    // Referências Comerciais
+    // REF_01NOME, REF_02NOME, REF_03NOME, REF_01FONE, REF_02FONE, REF_03FONE
+    
+    // Endereço de Cobrança
+    // COB_ENDERECO, COB_BAIRRO, COB_CIDADE, COB_UF, COB_CEP
+    
+    // Datas Específicas
+    // DATACADASTRO, ALTERADO, DATA_CONVERSAO, DATA_MEMBRO, DATA_AFASTADO
+    // DATA_EXAME, PROXIMO_EXAME
+    
+    // Veículos/Transporte
+    // TIPO_TRANSP, CODIGO_ANTT
+    
+    // Recibos e Contratos
+    // REC_CONTRATO, REC_CONTRATO_DATA, REC_DIMOB, REC_DIMOB_DATA
+    
+    // Contribuição
+    // VALOR_CONTRIBUICAO, CAPTADOR, CONTRIBUINTE
+    
+    // Deficiência
+    // DEFICIENCIA, TIPO_DEFICIENCIA
+    
+    // Contrato de Trabalho
+    // CONTRATO_EXPERIENCIA, APRENDIZ, PRIMEIRO_EMPREGO
+    
+    // OPF e Outros
+    // OPF, OPF_DESCRICAO, MES_VENCIMENTO, DIA_FATURA
+    
+    // Sistema/Controle
+    // IDSOFT, REPLICADO, ID_OLD, RECNO
+    
+    // Outros campos diversos
+    // CLASSES, DATACADASTRO, ALTERADO, TIPO_TRANSP, CODIGO_ANTT, CONTABIL
+    // MEMBRO, EQUIPE_ID, DATA_CONVERSAO, DATA_MEMBRO, EMPREGADO, DOM_ID
+    // DATA_AFASTADO, VIUVO, ORFAO, PAGAMENTO_ID, ORACAO, PAGAMENTO_VALOR
+    // PERIODO, DC, FV, IMPOSTOS, PESSOAL, CAMPANHA_ID, CC_ID, TIPO_CLIENTE
+    // ESPECIE, CNH_EMISSAO1, USUARIONOME_I, USUARIONOME_A, USUARIONOME_D
+    // TIPO_FISCAL, CRACHA, NOME_CRACHA, BATE_PONTO, CARGO, FUNCAO
+    // DEPARTAMENTO_ID, DEPARTAMENTO, COMPRAS, FUNCIONARIOS
+    // DEPARTAMENTO_ID_SEG, DEPARTAMENTO_SEG, ULTIMA_COMPRA, BLOQUEADO
+    // CONTATORH_ID, CONTATORH, DIA_FATURA, PIS, SETOR, SALARIO
+    
+    **************************************************************************
+  }
 end;
 
 procedure TForm_Principal.btn_ConfigurarClick(Sender: TObject);
