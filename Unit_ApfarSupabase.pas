@@ -36,6 +36,7 @@ type
     procedure btn_ConfigurarClick(Sender: TObject);
     procedure btn_FecharClick(Sender: TObject);
     procedure btn_ImportarLoteDesvioClick(Sender: TObject);
+    procedure btn_ImportarLicitacaoClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -55,6 +56,391 @@ uses Unit_ConfigSqlServer, Unit_Activity;
 procedure TForm_Principal.btn_FecharClick(Sender: TObject);
 begin
   Application.Terminate;
+end;
+
+procedure TForm_Principal.btn_ImportarLicitacaoClick(Sender: TObject);
+const
+  WHERE_CLAUSE =
+    ' WHERE pessoa_vr in (''16531'',''11020'')';
+
+  SQL_UPSERT =
+    'INSERT INTO public.tblicitacao (' +
+    '  licitacao_id, cliente_id, orgao_id, data, processo, processo_ano,' +
+    '  processo_admin, processo_admin_ano, portaria, portaria_ano,' +
+    '  modalidade_id, modalidade_numero, modalidade_ano, objeto_id,' +
+    '  data_inc, usuario_i, data_alt, usuario_a, data_del, usuario_d,' +
+    '  hora, participa, motivo, obs, tipo, deletado, ganha,' +
+    '  vendedor_id, vigencia, entrega, validade_cotacao, vigencia_data,' +
+    '  homologacao, tipo_entrega, origem, garantia_preco, site,' +
+    '  entregas, licitacao_origem, vigencia_ini, status,' +
+    '  obs_interno, obs_cliente, sync, sync_data, objeto, modalidade,' +
+    '  usuarionome_i, usuarionome_a, usuarionome_d, pessoa_vr, vendedor' +
+    ') VALUES (' +
+    '  :licitacao_id, :cliente_id, :orgao_id, :data, :processo, :processo_ano,' +
+    '  :processo_admin, :processo_admin_ano, :portaria, :portaria_ano,' +
+    '  :modalidade_id, :modalidade_numero, :modalidade_ano, :objeto_id,' +
+    '  :data_inc, :usuario_i, :data_alt, :usuario_a, :data_del, :usuario_d,' +
+    '  :hora, :participa, :motivo, :obs, :tipo, :deletado, :ganha,' +
+    '  :vendedor_id, :vigencia, :entrega, :validade_cotacao, :vigencia_data,' +
+    '  :homologacao, :tipo_entrega, :origem, :garantia_preco, :site,' +
+    '  :entregas, :licitacao_origem, :vigencia_ini, :status,' +
+    '  :obs_interno, :obs_cliente, :sync, (now() at time zone ''America/Sao_Paulo''), :objeto, :modalidade,' +
+    '  :usuarionome_i, :usuarionome_a, :usuarionome_d, :pessoa_vr, :vendedor' +
+    ') ON CONFLICT (licitacao_id) DO UPDATE SET ' +
+    '  cliente_id=EXCLUDED.cliente_id, orgao_id=EXCLUDED.orgao_id, data=EXCLUDED.data,' +
+    '  processo=EXCLUDED.processo, processo_ano=EXCLUDED.processo_ano,' +
+    '  processo_admin=EXCLUDED.processo_admin, processo_admin_ano=EXCLUDED.processo_admin_ano,' +
+    '  portaria=EXCLUDED.portaria, portaria_ano=EXCLUDED.portaria_ano,' +
+    '  modalidade_id=EXCLUDED.modalidade_id, modalidade_numero=EXCLUDED.modalidade_numero,' +
+    '  modalidade_ano=EXCLUDED.modalidade_ano, objeto_id=EXCLUDED.objeto_id,' +
+    '  data_inc=EXCLUDED.data_inc, usuario_i=EXCLUDED.usuario_i,' +
+    '  data_alt=EXCLUDED.data_alt, usuario_a=EXCLUDED.usuario_a,' +
+    '  data_del=EXCLUDED.data_del, usuario_d=EXCLUDED.usuario_d,' +
+    '  hora=EXCLUDED.hora, participa=EXCLUDED.participa, motivo=EXCLUDED.motivo,' +
+    '  obs=EXCLUDED.obs, tipo=EXCLUDED.tipo, deletado=EXCLUDED.deletado,' +
+    '  ganha=EXCLUDED.ganha, vendedor_id=EXCLUDED.vendedor_id,' +
+    '  vigencia=EXCLUDED.vigencia, entrega=EXCLUDED.entrega,' +
+    '  validade_cotacao=EXCLUDED.validade_cotacao, vigencia_data=EXCLUDED.vigencia_data,' +
+    '  homologacao=EXCLUDED.homologacao, tipo_entrega=EXCLUDED.tipo_entrega,' +
+    '  origem=EXCLUDED.origem, garantia_preco=EXCLUDED.garantia_preco,' +
+    '  site=EXCLUDED.site, entregas=EXCLUDED.entregas,' +
+    '  licitacao_origem=EXCLUDED.licitacao_origem, vigencia_ini=EXCLUDED.vigencia_ini,' +
+    '  status=EXCLUDED.status, obs_interno=EXCLUDED.obs_interno,' +
+    '  obs_cliente=EXCLUDED.obs_cliente, sync=EXCLUDED.sync,' +
+    '  sync_data=(now() at time zone ''America/Sao_Paulo''),' +
+    '  objeto=EXCLUDED.objeto, modalidade=EXCLUDED.modalidade,' +
+    '  usuarionome_i=EXCLUDED.usuarionome_i, usuarionome_a=EXCLUDED.usuarionome_a,' +
+    '  usuarionome_d=EXCLUDED.usuarionome_d, pessoa_vr=EXCLUDED.pessoa_vr,' +
+    '  vendedor=EXCLUDED.vendedor';
+
+var
+  qUp: TFDQuery;
+  fs: TFormatSettings;
+  Ini: TIniFile;
+  TotalRecords, CurrentRecord: Integer;
+
+  procedure CloseActivityForm;
+  begin
+    if Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity.Close;
+      except
+        // Ignora erros de fechamento
+      end;
+      try
+        FreeAndNil(Form_Activity);
+      except
+        // Ignora erros de liberação
+      end;
+    end;
+  end;
+
+  procedure SetDateParam(const PName: string; F: TField);
+  var s: string; d: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDate;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType = ftDate then
+        qUp.ParamByName(PName).AsDate := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDate(s, d, fs) then
+          qUp.ParamByName(PName).AsDate := d
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
+    end;
+  end;
+
+  procedure SetTimeParam(const PName: string; F: TField);
+  var s: string; t: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftTime;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType = ftTime then
+        qUp.ParamByName(PName).AsTime := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else
+        begin
+          try
+            t := StrToTime(s);
+            qUp.ParamByName(PName).AsTime := t;
+          except
+            qUp.ParamByName(PName).Clear;
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  procedure SetTimestampParam(const PName: string; F: TField);
+  var s: string; dt: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDateTime;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType in [ftDateTime, ftTimeStamp] then
+        qUp.ParamByName(PName).AsDateTime := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDateTime(s, dt, fs) then
+          qUp.ParamByName(PName).AsDateTime := dt
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
+    end;
+  end;
+
+begin
+  // formato para parse dd/MM/yyyy (somente se o SQL retornar texto)
+  fs := TFormatSettings.Create;
+  fs.DateSeparator   := '/';
+  fs.ShortDateFormat := 'dd/MM/yyyy';
+  fs.TimeSeparator   := ':';
+  fs.ShortTimeFormat := 'hh:nn:ss';
+
+  FDConnectionSupabase.Connected := True;
+
+  // 1) Configurar conexão SICFAR (Firebird)
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
+  finally
+    Ini.Free;
+  end;
+
+  // 2) Preparar consulta no SICFAR usando o componente qSICFAR do formulário
+  qSICFAR.Close;
+  qSICFAR.Connection := FDConnectionSICFAR;
+  qSICFAR.SQL.Clear;
+  qSICFAR.SQL.Add('SELECT');
+  qSICFAR.SQL.Add('  LICITACAO_ID,');
+  qSICFAR.SQL.Add('  PESSOA_ID,');
+  qSICFAR.SQL.Add('  DATA,');
+  qSICFAR.SQL.Add('  PROCESSO,');
+  qSICFAR.SQL.Add('  PROCESSO_ANO,');
+  qSICFAR.SQL.Add('  PROCESSO_ADMIN,');
+  qSICFAR.SQL.Add('  PROCESSO_ADMIN_ANO,');
+  qSICFAR.SQL.Add('  PORTARIA,');
+  qSICFAR.SQL.Add('  PORTARIA_ANO,');
+  qSICFAR.SQL.Add('  MODALIDADE_ID,');
+  qSICFAR.SQL.Add('  MODALIDADE_NUMERO,');
+  qSICFAR.SQL.Add('  MODALIDADE_ANO,');
+  qSICFAR.SQL.Add('  OBJETO_ID,');
+  qSICFAR.SQL.Add('  DATA_INC,');
+  qSICFAR.SQL.Add('  USUARIO_I,');
+  qSICFAR.SQL.Add('  DATA_ALT,');
+  qSICFAR.SQL.Add('  USUARIO_A,');
+  qSICFAR.SQL.Add('  DATA_DEL,');
+  qSICFAR.SQL.Add('  USUARIO_D,');
+  qSICFAR.SQL.Add('  HORA,');
+  qSICFAR.SQL.Add('  PARTICIPA,');
+  qSICFAR.SQL.Add('  MOTIVO,');
+  qSICFAR.SQL.Add('  OBS,');
+  qSICFAR.SQL.Add('  TIPO,');
+  qSICFAR.SQL.Add('  DELETADO,');
+  qSICFAR.SQL.Add('  GANHA,');
+  qSICFAR.SQL.Add('  PESSOA_VR,');
+  qSICFAR.SQL.Add('  VIGENCIA,');
+  qSICFAR.SQL.Add('  ENTREGA,');
+  qSICFAR.SQL.Add('  VALIDADE_COTACAO,');
+  qSICFAR.SQL.Add('  CLIENTE_ID,');
+  qSICFAR.SQL.Add('  VIGENCIA_DATA,');
+  qSICFAR.SQL.Add('  HOMOLOGACAO,');
+  qSICFAR.SQL.Add('  TIPO_ENTREGA,');
+  qSICFAR.SQL.Add('  ORIGEM,');
+  qSICFAR.SQL.Add('  GARANTIA_PRECO,');
+  qSICFAR.SQL.Add('  SITE,');
+  qSICFAR.SQL.Add('  ENTREGAS,');
+  qSICFAR.SQL.Add('  USUARIONOME_I,');
+  qSICFAR.SQL.Add('  USUARIONOME_A,');
+  qSICFAR.SQL.Add('  USUARIONOME_D,');
+  qSICFAR.SQL.Add('  LICITACAO_ORIGEM,');
+  qSICFAR.SQL.Add('  VIGENCIA_INI,');
+  qSICFAR.SQL.Add('  STATUS,');
+  qSICFAR.SQL.Add('  OBS_INTERNO,');
+  qSICFAR.SQL.Add('  OBS_CLIENTE,');
+  qSICFAR.SQL.Add('  SYNC,');
+  qSICFAR.SQL.Add('  SYNC_DATA');
+  qSICFAR.SQL.Add('FROM TBLICITACAO');
+  qSICFAR.SQL.Add(WHERE_CLAUSE);
+  qSICFAR.SQL.Add('ORDER BY LICITACAO_ID');
+
+  // Exibir Form de Atividade e contar registros
+  if not Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity := TForm_Activity.Create(Application);
+      Form_Activity.Show;
+      Form_Activity.Label_Status.Caption := 'Executando consulta...';
+      Application.ProcessMessages;
+    except
+      on E: Exception do
+      begin
+        if Assigned(Form_Activity) then
+          FreeAndNil(Form_Activity);
+        raise Exception.Create('Erro ao criar formulário de atividade: ' + E.Message);
+      end;
+    end;
+  end;
+
+  qSICFAR.Open;
+
+  TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
+    'SELECT COUNT(*) FROM TBLICITACAO' + WHERE_CLAUSE
+  );
+
+  if Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords]);
+      Application.ProcessMessages;
+    except
+      // Ignora erros na interface
+    end;
+  end;
+  Sleep(500);
+
+  // 3) Prepara o UPSERT no Supabase
+  qUp := TFDQuery.Create(nil);
+  try
+    qUp.Connection := FDConnectionSupabase;
+    qUp.SQL.Text   := SQL_UPSERT;
+
+    FDConnectionSupabase.StartTransaction;
+    try
+      qSICFAR.First;
+      CurrentRecord := 0;
+      while not qSICFAR.Eof do
+      begin
+        Inc(CurrentRecord);
+
+        if Assigned(Form_Activity) then
+        begin
+          try
+            Form_Activity.Label_Status.Caption := Format('Importando registro %d de %d...', [CurrentRecord, TotalRecords]);
+            Application.ProcessMessages;
+          except
+            // Ignora erros na interface
+          end;
+        end;
+
+        // Mapeamento de parâmetros Firebird → Supabase
+        qUp.ParamByName('licitacao_id').AsInteger := qSICFAR.FieldByName('LICITACAO_ID').AsInteger;
+        qUp.ParamByName('cliente_id').AsInteger := qSICFAR.FieldByName('PESSOA_ID').AsInteger;
+        qUp.ParamByName('orgao_id').AsInteger := qSICFAR.FieldByName('CLIENTE_ID').AsInteger;
+
+        SetDateParam('data', qSICFAR.FieldByName('DATA'));
+
+        qUp.ParamByName('processo').AsString := qSICFAR.FieldByName('PROCESSO').AsString;
+        qUp.ParamByName('processo_ano').AsString := qSICFAR.FieldByName('PROCESSO_ANO').AsString;
+        qUp.ParamByName('processo_admin').AsString := qSICFAR.FieldByName('PROCESSO_ADMIN').AsString;
+        qUp.ParamByName('processo_admin_ano').AsString := qSICFAR.FieldByName('PROCESSO_ADMIN_ANO').AsString;
+        qUp.ParamByName('portaria').AsString := qSICFAR.FieldByName('PORTARIA').AsString;
+        qUp.ParamByName('portaria_ano').AsString := qSICFAR.FieldByName('PORTARIA_ANO').AsString;
+        qUp.ParamByName('modalidade_id').AsInteger := qSICFAR.FieldByName('MODALIDADE_ID').AsInteger;
+        qUp.ParamByName('modalidade_numero').AsString := qSICFAR.FieldByName('MODALIDADE_NUMERO').AsString;
+        qUp.ParamByName('modalidade_ano').AsString := qSICFAR.FieldByName('MODALIDADE_ANO').AsString;
+        qUp.ParamByName('objeto_id').AsInteger := qSICFAR.FieldByName('OBJETO_ID').AsInteger;
+
+        SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
+        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_I').AsInteger;
+        SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
+        qUp.ParamByName('usuario_a').AsInteger := qSICFAR.FieldByName('USUARIO_A').AsInteger;
+        SetTimestampParam('data_del', qSICFAR.FieldByName('DATA_DEL'));
+        qUp.ParamByName('usuario_d').AsInteger := qSICFAR.FieldByName('USUARIO_D').AsInteger;
+
+        SetTimeParam('hora', qSICFAR.FieldByName('HORA'));
+
+        qUp.ParamByName('participa').AsString := qSICFAR.FieldByName('PARTICIPA').AsString;
+        qUp.ParamByName('motivo').AsString := qSICFAR.FieldByName('MOTIVO').AsString;
+        qUp.ParamByName('obs').AsString := qSICFAR.FieldByName('OBS').AsString;
+        qUp.ParamByName('tipo').AsString := qSICFAR.FieldByName('TIPO').AsString;
+        qUp.ParamByName('deletado').AsString := qSICFAR.FieldByName('DELETADO').AsString;
+        qUp.ParamByName('ganha').AsString := qSICFAR.FieldByName('GANHA').AsString;
+        qUp.ParamByName('vendedor_id').AsInteger := qSICFAR.FieldByName('PESSOA_VR').AsInteger;
+        qUp.ParamByName('vigencia').AsFloat := qSICFAR.FieldByName('VIGENCIA').AsFloat;
+        qUp.ParamByName('entrega').AsFloat := qSICFAR.FieldByName('ENTREGA').AsFloat;
+
+        SetDateParam('validade_cotacao', qSICFAR.FieldByName('VALIDADE_COTACAO'));
+        SetDateParam('vigencia_data', qSICFAR.FieldByName('VIGENCIA_DATA'));
+        SetDateParam('homologacao', qSICFAR.FieldByName('HOMOLOGACAO'));
+
+        qUp.ParamByName('tipo_entrega').AsString := qSICFAR.FieldByName('TIPO_ENTREGA').AsString;
+        qUp.ParamByName('origem').AsString := qSICFAR.FieldByName('ORIGEM').AsString;
+
+        SetDateParam('garantia_preco', qSICFAR.FieldByName('GARANTIA_PRECO'));
+
+        qUp.ParamByName('site').AsString := qSICFAR.FieldByName('SITE').AsString;
+        qUp.ParamByName('entregas').AsInteger := qSICFAR.FieldByName('ENTREGAS').AsInteger;
+        qUp.ParamByName('licitacao_origem').AsInteger := qSICFAR.FieldByName('LICITACAO_ORIGEM').AsInteger;
+
+        SetDateParam('vigencia_ini', qSICFAR.FieldByName('VIGENCIA_INI'));
+
+        qUp.ParamByName('status').AsString := qSICFAR.FieldByName('STATUS').AsString;
+        qUp.ParamByName('obs_interno').AsString := qSICFAR.FieldByName('OBS_INTERNO').AsString;
+        qUp.ParamByName('obs_cliente').AsString := qSICFAR.FieldByName('OBS_CLIENTE').AsString;
+        qUp.ParamByName('sync').AsString := qSICFAR.FieldByName('SYNC').AsString;
+
+        // Campos adicionais no Supabase que não existem no Firebird
+        qUp.ParamByName('objeto').AsString := '';
+        qUp.ParamByName('modalidade').AsString := '';
+        qUp.ParamByName('usuarionome_i').AsString := qSICFAR.FieldByName('USUARIONOME_I').AsString;
+        qUp.ParamByName('usuarionome_a').AsString := qSICFAR.FieldByName('USUARIONOME_A').AsString;
+        qUp.ParamByName('usuarionome_d').AsString := qSICFAR.FieldByName('USUARIONOME_D').AsString;
+        qUp.ParamByName('pessoa_vr').AsInteger := qSICFAR.FieldByName('PESSOA_VR').AsInteger;
+        qUp.ParamByName('vendedor').AsString := '';
+
+        qUp.ExecSQL;
+
+        // Controle de performance: atualiza interface a cada 10 registros
+        if CurrentRecord mod 10 = 0 then
+        begin
+          try
+            Application.ProcessMessages;
+          except
+            // Ignora erros no ProcessMessages
+          end;
+          Sleep(10);
+        end;
+
+        qSICFAR.Next;
+      end;
+
+      FDConnectionSupabase.Commit;
+      CloseActivityForm;
+      ShowMessage('Importação de licitações concluída com sucesso.');
+    except
+      on E: Exception do
+      begin
+        FDConnectionSupabase.Rollback;
+        CloseActivityForm;
+        raise;
+      end;
+    end;
+  finally
+    qUp.Free;
+    if qSICFAR.Active then qSICFAR.Close;
+    if FDConnectionSICFAR.Connected then FDConnectionSICFAR.Connected := False;
+  end;
 end;
 
 procedure TForm_Principal.btn_ImportarLoteDesvioClick(Sender: TObject);
@@ -84,8 +470,6 @@ begin
   // Desabilita botão durante a operação
   btn_ImportarLoteDesvio.Enabled := False;
   Ini        := nil;
-  TotalRecords := 0;
-  CurrentRecord := 0;
 
   try
     try

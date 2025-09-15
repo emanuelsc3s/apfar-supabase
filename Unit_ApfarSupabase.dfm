@@ -102,6 +102,7 @@ object Form_Principal: TForm_Principal
     ParentBackground = False
     ParentFont = False
     TabOrder = 4
+    OnClick = btn_ImportarLicitacaoClick
   end
   object btn_ImportarLoteDesvio: TPanel
     Left = 336
