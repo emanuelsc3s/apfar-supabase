@@ -446,6 +446,16 @@ begin
 end;
 
 procedure TForm_Principal.btn_ImportarLoteDesvioClick(Sender: TObject);
+const
+  FROM_JOIN_CLAUSE =
+    'FROM tbdesvio_produto dp ' +
+    'JOIN tbdesvio d ON d.desvio_id = dp.desvio_id ';
+  WHERE_CLAUSE =
+    ' WHERE dp.deletado = ''N'' ' +
+    ' AND d.deletado  = ''N'' ' +
+    ' AND dp.lote IS NOT NULL ';
+  // Condição opcional:
+  // ' AND dp.lote = ''24C12184E'' ';
 var
   Ini          : TIniFile;
   TotalRecords, CurrentRecord: Integer;
@@ -492,16 +502,10 @@ begin
     qSICFAR.SQL.Clear;
     qSICFAR.SQL.Add('SELECT');
     qSICFAR.SQL.Add('  dp.lote,');
-    qSICFAR.SQL.Add('  LIST(DISTINCT d.desvio, '', '') AS desvios,');
+    qSICFAR.SQL.Add('  d.status,');
     qSICFAR.SQL.Add('  LIST(DISTINCT CAST(dp.desvio_id AS VARCHAR(20)), '','') AS desvios_ids');
-    qSICFAR.SQL.Add('FROM tbdesvio_produto dp');
-    qSICFAR.SQL.Add('JOIN tbdesvio d');
-    qSICFAR.SQL.Add('  ON d.desvio_id = dp.desvio_id');
-    qSICFAR.SQL.Add('WHERE dp.deletado = ''N''');
-    qSICFAR.SQL.Add('  AND d.deletado  = ''N''');
-    qSICFAR.SQL.Add('  AND dp.lote IS NOT NULL');
-
-//    qSICFAR.SQL.Add(' and dp.lote = ''24C12184E'' ');
+    qSICFAR.SQL.Add(FROM_JOIN_CLAUSE);
+    qSICFAR.SQL.Add(WHERE_CLAUSE);
 
     qSICFAR.SQL.Add('GROUP BY dp.lote;');
 
@@ -532,10 +536,8 @@ begin
       TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
         'SELECT COUNT(*) FROM ( ' +
         'SELECT dp.lote ' +
-        'FROM tbdesvio_produto dp ' +
-        'JOIN tbdesvio d ON d.desvio_id = dp.desvio_id ' +
-        'WHERE dp.deletado = ''N'' AND d.deletado = ''N'' AND dp.lote IS NOT NULL ' +
-//        ' AND dp.lote = ''24C12184E'' ' +
+        FROM_JOIN_CLAUSE +
+        WHERE_CLAUSE +
         'GROUP BY dp.lote ' +
         ') T'
       );
