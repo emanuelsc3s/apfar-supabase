@@ -459,8 +459,6 @@ const
 var
   Ini          : TIniFile;
   TotalRecords, CurrentRecord: Integer;
-  ids, firstId: string;
-  posComma: Integer;
 
   procedure CloseActivityForm;
   begin
@@ -497,17 +495,23 @@ begin
     Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
 
     // 2) Preparar consulta no SICFAR usando o componente qSICFAR do formulário
+    DataSource1.DataSet := qSICFAR;
+
     qSICFAR.Close;
     qSICFAR.Connection := FDConnectionSICFAR;
     qSICFAR.SQL.Clear;
     qSICFAR.SQL.Add('SELECT');
     qSICFAR.SQL.Add('  dp.lote,');
-    qSICFAR.SQL.Add('  d.status,');
-    qSICFAR.SQL.Add('  LIST(DISTINCT CAST(dp.desvio_id AS VARCHAR(20)), '','') AS desvios_ids');
+    qSICFAR.SQL.Add('  CASE');
+    qSICFAR.SQL.Add('    WHEN COUNT(CASE WHEN d.status NOT IN (''Concluído'', ''Rejeitado - GQT'', ''Cancelado'') THEN 1 END) = 0 THEN ''TODOS_CONCLUIDOS''');
+    qSICFAR.SQL.Add('    ELSE ''PENDENTE''');
+    qSICFAR.SQL.Add('  END AS status_lote,');
+    qSICFAR.SQL.Add('  LIST(DISTINCT CAST(dp.desvio_id AS VARCHAR(20)), '','') AS desvios_ids,');
+    qSICFAR.SQL.Add('  LIST(DISTINCT d.status, '','') AS status_list');
     qSICFAR.SQL.Add(FROM_JOIN_CLAUSE);
     qSICFAR.SQL.Add(WHERE_CLAUSE);
 
-    qSICFAR.SQL.Add('GROUP BY dp.lote;');
+    qSICFAR.SQL.Add('GROUP BY dp.lote');
 
 
     // 2.1) Form de atividade
@@ -534,12 +538,9 @@ begin
     // 2.3) Contar total para feedback (usa subselect)
     try
       TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
-        'SELECT COUNT(*) FROM ( ' +
-        'SELECT dp.lote ' +
+        'SELECT COUNT(DISTINCT dp.lote) ' +
         FROM_JOIN_CLAUSE +
-        WHERE_CLAUSE +
-        'GROUP BY dp.lote ' +
-        ') T'
+        WHERE_CLAUSE
       );
     except
       // Se falhar a contagem, segue sem total
@@ -573,36 +574,53 @@ begin
           try
             if TotalRecords > 0 then
               Form_Activity.Label_Status.Caption :=
-                Format('Atualizando registro %d de %d... Lote: %s', [CurrentRecord, TotalRecords, Trim(qSICFAR.FieldByName('lote').AsString)])
+                Format('Atualizando registro %d de %d... Lote: %s [%s]',
+                  [CurrentRecord, TotalRecords,
+                   Trim(qSICFAR.FieldByName('lote').AsString),
+                   Trim(qSICFAR.FieldByName('status_lote').AsString)])
             else
               Form_Activity.Label_Status.Caption :=
-                'Atualizando... Lote: ' + Trim(qSICFAR.FieldByName('lote').AsString);
+                Format('Atualizando... Lote: %s [%s]',
+                  [Trim(qSICFAR.FieldByName('lote').AsString),
+                   Trim(qSICFAR.FieldByName('status_lote').AsString)]);
             Application.ProcessMessages;
           except
             // Ignora erros na interface
           end;
         end;
-        // Extrair o primeiro ID de desvio da lista concatenada (desvios_ids)
-        ids := Trim(qSICFAR.FieldByName('desvios_ids').AsString);
-        firstId := ids;
-        posComma := Pos(',', firstId);
+        // Utiliza a lista completa de IDs (desvios_ids) sem extrair apenas o primeiro ID
 
-        if posComma > 0 then
-          firstId := Copy(firstId, 1, posComma - 1);
-
-        // 3) Preparar UPDATE no TOTVS (parametrizado)
+        // 3) Preparar UPDATE no TOTVS (parametrizado) com lógica condicional baseada no status do lote
         with qTOTVS do
           begin
               Close;
               Connection := FDConnectionTOTVS;
-              SQL.Text :=
-              'UPDATE SD7010 ' +
-              'SET D7_YSICCQ = :pDesvioId ' +
-              'WHERE D_E_L_E_T_ = '''' ' +
-              '  AND D7_LOTECTL = :pLote';
 
-              ParamByName('pDesvioId').AsString := Copy(qSICFAR.FieldByName('desvios').AsString,1,10);
-              ParamByName('pLote').AsString     := qSICFAR.FieldByName('lote').AsString;
+              // Verificar se todos os desvios do lote estão concluídos
+              if Trim(qSICFAR.FieldByName('status_lote').AsString) = 'TODOS_CONCLUIDOS' then
+              begin
+                // Se todos os desvios estão concluídos, limpar o campo D7_YSICCQ
+                SQL.Text :=
+                'UPDATE SD7010 ' +
+                'SET D7_YSICCQ = '''' ' +
+                'WHERE D_E_L_E_T_ = '''' ' +
+                '  AND D7_LOTECTL = :pLote';
+
+                ParamByName('pLote').AsString := qSICFAR.FieldByName('lote').AsString;
+              end
+              else
+              begin
+                // Se há desvios pendentes, manter/alimentar o campo D7_YSICCQ normalmente
+                SQL.Text :=
+                'UPDATE SD7010 ' +
+                'SET D7_YSICCQ = :pDesvioId ' +
+                'WHERE D_E_L_E_T_ = '''' ' +
+                '  AND D7_LOTECTL = :pLote';
+
+                // Obs.: Certifique-se de que o campo D7_YSICCQ no TOTVS comporte o tamanho total da lista
+                ParamByName('pDesvioId').AsString := qSICFAR.FieldByName('desvios_ids').AsString;
+                ParamByName('pLote').AsString     := qSICFAR.FieldByName('lote').AsString;
+              end;
 
               qTOTVS.ExecSQL;
           end;
