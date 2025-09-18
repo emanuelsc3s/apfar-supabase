@@ -1217,15 +1217,17 @@ begin
         qUp.ParamByName('bairro').AsString := qSICFAR.FieldByName('BAIRRO').AsString;
         qUp.ParamByName('cidade_id').AsInteger := qSICFAR.FieldByName('CIDADE_ID').AsInteger;
         
-        // Campo CIDADE não está no SELECT; enviar nulo
+        // Campo CIDADE não está no SELECT; enviar nulo (definir DataType explícito)
+        qUp.ParamByName('cidade').DataType := ftString;
         qUp.ParamByName('cidade').Clear;
-        
+
         qUp.ParamByName('uf').AsString := qSICFAR.FieldByName('UF').AsString;
         qUp.ParamByName('cep').AsString := qSICFAR.FieldByName('CEP').AsString;
         
-        // Campo PESSOA_VR não está no SELECT; enviar nulo
+        // Campo PESSOA_VR não está no SELECT; enviar nulo (definir DataType explícito para evitar erro do FireDAC)
+        qUp.ParamByName('vendedor_id').DataType := ftInteger;
         qUp.ParamByName('vendedor_id').Clear;
-        
+
         qUp.ParamByName('naturalidade').AsString := qSICFAR.FieldByName('NATURALIDADE').AsString;
 
         SetDateParam('nascimento', qSICFAR.FieldByName('NASCIMENTO'));
@@ -1281,7 +1283,8 @@ begin
 
         SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
 
-        // Campo USUARIO_ID não está no SELECT; enviar nulo
+        // Campo USUARIO_ID não está no SELECT; enviar nulo (definir DataType explícito)
+        qUp.ParamByName('usuario_i').DataType := ftInteger;
         qUp.ParamByName('usuario_i').Clear;
 
         SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
