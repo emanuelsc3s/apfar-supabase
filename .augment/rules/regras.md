@@ -2,14 +2,6 @@
 type: "always_apply"
 ---
 
-# CLAUDE.md
-
-Este arquivo fornece orientação a Claude Code (claude.ai/code) ao trabalhar com código neste repositório.
-
-# LANGUAGE
-
-Sempre me responda, escreva comentários no código, gere documentações no idioma português do Brasil.
-
 # Projeto apfar-supabase - Importador de dados para Supabase
 
 ## Visão Geral do Projeto
@@ -19,12 +11,11 @@ Foque apenas nos arquivos de código fonte *.pas e *.dfm .
 **ATUE COMO UM DESENVOLVEDOR SÊNIOR EM DELPHI** com profundo conhecimento da linguagem Object Pascal/Delphi.
 
 ### Versão do Delphi
-- **Delphi 10.4 Seattle** (Embarcadero RAD Studio)
+- **Delphi 10.4** (Embarcadero RAD Studio)
 - Compatibilidade com recursos até essa versão
 - Evitar sintaxe/recursos de versões mais recentes
 
 ## Objetivo
-Ajudar com evolução do projeto e melhoria do código existente, mantendo compatibilidade com Delphi.
 Build e testes serão feitos externamente na IDE do Delphi.
 Ignore completamente a estrutura de configuração - trabalhe apenas com código fonte.
 
@@ -35,6 +26,23 @@ Ignore completamente a estrutura de configuração - trabalhe apenas com código
 - Gerenciamento de memória manual
 - Componentes VCL
 - Padrões de design comuns em Delphi
+
+# Regras de Strings SQL no Delphi
+
+- Sempre que gerar SQL em Delphi dentro de literais de string delimitadas por aspas simples, use aspas simples duplicadas para representar uma aspa literal:
+  - Correto: 'where campo = ''N'''
+  - Incorreto: 'where campo = ''''N'''''
+
+- Para listas/IN com valores literais, cada valor deve usar aspas duplicadas:
+  - Correto: '... IN (''16531'',''11020'')'
+  - Incorreto: '... IN (''''16531'''',''''11020'''')'
+
+- Justificativa: No Delphi, a aspa simples dentro de uma string deve ser escapada por duplicação (''), não por quadruplicação.
+
+- Ao construir SQL com q.SQL.Add(...), sempre revisar a quantidade de aspas ao redor de literais:
+  - Exemplos:
+    q.SQL.Add('where p.deletado = ''N''');
+    q.SQL.Add('and l.pessoa_vr in (''16531'',''11020'')');
 
 ## Arquivos Relevantes
 - **Analisar apenas**: arquivos `.pas` e `.dfm`
@@ -74,30 +82,10 @@ Ignore completamente a estrutura de configuração - trabalhe apenas com código
 - **Formulário Primário**: `Unit_ApfarSupabase.pas` - Formulário principal que gerencia conexões e operações com o banco de dados
 - **Layout do Formulário**: `Unit_ApfarSupabase.dfm` - Componentes visuais e propriedades
 
-### Arquitetura do Banco de Dados
-
-A aplicação utiliza componentes FireDAC para conectividade dupla com o banco de dados:
-
-1. **Conexão Supabase** (`FDConnection1`):
-- Banco de dados PostgreSQL via Supabase
-- Conexão: `aws-0-sa-east-1.pooler.supabase.com:5432`
-- Banco de Dados: `postgres`
-- Utiliza o modo de pooler de sessões com SSL necessário
-
-2. **Conexão TOTVS** (`FDConnectionTOTVS`):
-- Banco de dados SQL Server para integração com o TOTVS ERP
-- Configuração carregada do arquivo `BaseSIC.ini`
-- Suporta Autenticação SQL e Autenticação do Windows
-
-### Dependências
-- Bibliotecas do cliente PostgreSQL (libpq.dll e DLLs relacionadas na pasta Win64)
-- Drivers FireDAC para PostgreSQL e SQL Server
-
 ## Configuração
 
 - Os parâmetros de conexão do Supabase são codificados na criação do formulário
-- Os parâmetros de conexão do TOTVS são lidos do arquivo `BaseSIC.ini` no diretório do aplicativo
-- O arquivo INI deve conter uma seção `[Protheus]` com detalhes da conexão com o banco de dados
+- Os parâmetros de conexão a base de dados são lidos do arquivo `BaseSIC.ini` no diretório do aplicativo
 
 ## Estrutura de Documentação
 - **Diretório docs/**: Toda nova documentação deve ser salva em formato `*.md` no diretório `/docs/`
