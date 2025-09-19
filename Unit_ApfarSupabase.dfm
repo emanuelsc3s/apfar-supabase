@@ -161,6 +161,44 @@ object Form_Principal: TForm_Principal
     TabOrder = 7
     OnClick = btn_ExportaCotacaoClick
   end
+  object btn_ImportarLicitacaoItem: TPanel
+    Left = 483
+    Top = 351
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Imp. Licita'#231#227'o'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 8
+    OnClick = btn_ImportarLicitacaoItemClick
+  end
+  object btn_ImportarProduto: TPanel
+    Left = 609
+    Top = 351
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Imp. Receber'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 9
+    OnClick = btn_ImportarProdutoClick
+  end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (
       'Server=aws-0-sa-east-1.pooler.supabase.com'
