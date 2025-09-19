@@ -2,8 +2,8 @@ object Form_Principal: TForm_Principal
   Left = 0
   Top = 0
   Caption = 'Form_Principal'
-  ClientHeight = 350
-  ClientWidth = 863
+  ClientHeight = 404
+  ClientWidth = 872
   Color = clBtnFace
   Font.Charset = ANSI_CHARSET
   Font.Color = clWindowText
@@ -141,6 +141,25 @@ object Form_Principal: TForm_Principal
     ParentFont = False
     TabOrder = 6
     OnClick = btn_ClienteClick
+  end
+  object btn_ExportaCotacao: TPanel
+    Left = 357
+    Top = 351
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Exp. Cota'#231#227'o'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 7
+    OnClick = btn_ExportaCotacaoClick
   end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (

@@ -32,6 +32,7 @@ type
     qSICFAR: TFDQuery;
     FBDriverLink: TFDPhysFBDriverLink;
     btn_Cliente: TPanel;
+    btn_ExportaCotacao: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
@@ -39,6 +40,7 @@ type
     procedure btn_ImportarLoteDesvioClick(Sender: TObject);
     procedure btn_ImportarLicitacaoClick(Sender: TObject);
     procedure btn_ClienteClick(Sender: TObject);
+    procedure btn_ExportaCotacaoClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -63,7 +65,7 @@ end;
 procedure TForm_Principal.btn_ImportarLicitacaoClick(Sender: TObject);
 const
   WHERE_CLAUSE =
-    ' WHERE pessoa_vr in (''16531'',''11020'')';
+    ' WHERE deletado = ''N'' and pessoa_vr in (''16531'',''11020'')';
 
   SQL_UPSERT =
     'INSERT INTO public.tblicitacao (' +
@@ -248,7 +250,7 @@ begin
   qSICFAR.SQL.Add('  MODALIDADE_ANO,');
   qSICFAR.SQL.Add('  OBJETO_ID,');
   qSICFAR.SQL.Add('  DATA_INC,');
-  qSICFAR.SQL.Add('  USUARIO_ID,');
+  qSICFAR.SQL.Add('  USUARIO_I,');
   qSICFAR.SQL.Add('  DATA_ALT,');
   qSICFAR.SQL.Add('  USUARIO_A,');
   qSICFAR.SQL.Add('  DATA_DEL,');
@@ -347,24 +349,37 @@ begin
 
         // Mapeamento de parâmetros Firebird → Supabase
         qUp.ParamByName('licitacao_id').AsInteger := qSICFAR.FieldByName('LICITACAO_ID').AsInteger;
-        qUp.ParamByName('cliente_id').AsInteger := qSICFAR.FieldByName('PESSOA_ID').AsInteger;
-        qUp.ParamByName('orgao_id').AsInteger := qSICFAR.FieldByName('CLIENTE_ID').AsInteger;
+
+        // Tratar nulos corretamente para colunas inteiras (PostgreSQL: integer)
+        qUp.ParamByName('cliente_id').DataType := ftInteger;
+
+        if qSICFAR.FieldByName('CLIENTE_ID').IsNull then
+          qUp.ParamByName('cliente_id').Clear
+        else
+          qUp.ParamByName('cliente_id').AsInteger := qSICFAR.FieldByName('CLIENTE_ID').AsInteger;
+
+        qUp.ParamByName('orgao_id').DataType := ftInteger;
+
+        if qSICFAR.FieldByName('PESSOA_ID').IsNull then
+          qUp.ParamByName('orgao_id').Clear
+        else
+          qUp.ParamByName('orgao_id').AsInteger := qSICFAR.FieldByName('PESSOA_ID').AsInteger;
 
         SetDateParam('data', qSICFAR.FieldByName('DATA'));
 
-        qUp.ParamByName('processo').AsString := qSICFAR.FieldByName('PROCESSO').AsString;
-        qUp.ParamByName('processo_ano').AsString := qSICFAR.FieldByName('PROCESSO_ANO').AsString;
-        qUp.ParamByName('processo_admin').AsString := qSICFAR.FieldByName('PROCESSO_ADMIN').AsString;
+        qUp.ParamByName('processo').AsString           := qSICFAR.FieldByName('PROCESSO').AsString;
+        qUp.ParamByName('processo_ano').AsString       := qSICFAR.FieldByName('PROCESSO_ANO').AsString;
+        qUp.ParamByName('processo_admin').AsString     := qSICFAR.FieldByName('PROCESSO_ADMIN').AsString;
         qUp.ParamByName('processo_admin_ano').AsString := qSICFAR.FieldByName('PROCESSO_ADMIN_ANO').AsString;
-        qUp.ParamByName('portaria').AsString := qSICFAR.FieldByName('PORTARIA').AsString;
-        qUp.ParamByName('portaria_ano').AsString := qSICFAR.FieldByName('PORTARIA_ANO').AsString;
-        qUp.ParamByName('modalidade_id').AsInteger := qSICFAR.FieldByName('MODALIDADE_ID').AsInteger;
-        qUp.ParamByName('modalidade_numero').AsString := qSICFAR.FieldByName('MODALIDADE_NUMERO').AsString;
-        qUp.ParamByName('modalidade_ano').AsString := qSICFAR.FieldByName('MODALIDADE_ANO').AsString;
-        qUp.ParamByName('objeto_id').AsInteger := qSICFAR.FieldByName('OBJETO_ID').AsInteger;
+        qUp.ParamByName('portaria').AsString           := qSICFAR.FieldByName('PORTARIA').AsString;
+        qUp.ParamByName('portaria_ano').AsString       := qSICFAR.FieldByName('PORTARIA_ANO').AsString;
+        qUp.ParamByName('modalidade_id').AsInteger     := qSICFAR.FieldByName('MODALIDADE_ID').AsInteger;
+        qUp.ParamByName('modalidade_numero').AsString  := qSICFAR.FieldByName('MODALIDADE_NUMERO').AsString;
+        qUp.ParamByName('modalidade_ano').AsString     := qSICFAR.FieldByName('MODALIDADE_ANO').AsString;
+        qUp.ParamByName('objeto_id').AsInteger         := qSICFAR.FieldByName('OBJETO_ID').AsInteger;
 
         SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
-        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_ID').AsInteger;
+        qUp.ParamByName('usuario_i').AsInteger := qSICFAR.FieldByName('USUARIO_I').AsInteger;
         SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
         qUp.ParamByName('usuario_a').AsInteger := qSICFAR.FieldByName('USUARIO_A').AsInteger;
         SetTimestampParam('data_del', qSICFAR.FieldByName('DATA_DEL'));
@@ -391,8 +406,8 @@ begin
 
         SetDateParam('garantia_preco', qSICFAR.FieldByName('GARANTIA_PRECO'));
 
-        qUp.ParamByName('site').AsString := qSICFAR.FieldByName('SITE').AsString;
-        qUp.ParamByName('entregas').AsInteger := qSICFAR.FieldByName('ENTREGAS').AsInteger;
+        qUp.ParamByName('site').AsString              := qSICFAR.FieldByName('SITE').AsString;
+        qUp.ParamByName('entregas').AsInteger         := qSICFAR.FieldByName('ENTREGAS').AsInteger;
         qUp.ParamByName('licitacao_origem').AsInteger := qSICFAR.FieldByName('LICITACAO_ORIGEM').AsInteger;
 
         SetDateParam('vigencia_ini', qSICFAR.FieldByName('VIGENCIA_INI'));
@@ -1418,6 +1433,11 @@ begin
     Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
 
   Form_ConfigSqlServer.ShowModal;
+end;
+
+procedure TForm_Principal.btn_ExportaCotacaoClick(Sender: TObject);
+begin
+// Implementar
 end;
 
 procedure TForm_Principal.FormCreate(Sender: TObject);
