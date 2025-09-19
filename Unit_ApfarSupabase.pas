@@ -960,8 +960,294 @@ begin
 end;
 
 procedure TForm_Principal.btn_ImportarProdutoClick(Sender: TObject);
+const
+  // Importa apenas produtos não deletados
+  WHERE_CLAUSE =
+    ' WHERE deletado = ''N'' ';
+
+  SQL_UPSERT =
+    'INSERT INTO public.tbproduto (' +
+    '  produto_id, empresa_id, usuario_id, referencia, descricao, codbarra,' +
+    '  ipi, icms, unidade, peso_bruto, peso_liquido, estoque_minimo,' +
+    '  deletado, comissao, estoque_id, tipoproduto_id, grupo_id, subgrupo_id,' +
+    '  ncm, obs, erp_codigo, qtde_caixa, preco_maximo, data_inc, usuario_i,' +
+    '  data_alt, usuario_a, data_del, usuario_d, bloqueado, sync, sync_data' +
+    ') VALUES (' +
+    '  :produto_id, :empresa_id, :usuario_id, :referencia, :descricao, :codbarra,' +
+    '  :ipi, :icms, :unidade, :peso_bruto, :peso_liquido, :estoque_minimo,' +
+    '  :deletado, :comissao, :estoque_id, :tipoproduto_id, :grupo_id, :subgrupo_id,' +
+    '  :ncm, :obs, :erp_codigo, :qtde_caixa, :preco_maximo, :data_inc, :usuario_i,' +
+    '  :data_alt, :usuario_a, :data_del, :usuario_d, :bloqueado, :sync,' +
+    '  (now() at time zone ''America/Sao_Paulo'')' +
+    ') ON CONFLICT (produto_id) DO UPDATE SET ' +
+    '  empresa_id=EXCLUDED.empresa_id, usuario_id=EXCLUDED.usuario_id,' +
+    '  referencia=EXCLUDED.referencia, descricao=EXCLUDED.descricao,' +
+    '  codbarra=EXCLUDED.codbarra, ipi=EXCLUDED.ipi, icms=EXCLUDED.icms,' +
+    '  unidade=EXCLUDED.unidade, peso_bruto=EXCLUDED.peso_bruto,' +
+    '  peso_liquido=EXCLUDED.peso_liquido, estoque_minimo=EXCLUDED.estoque_minimo,' +
+    '  deletado=EXCLUDED.deletado, comissao=EXCLUDED.comissao,' +
+    '  estoque_id=EXCLUDED.estoque_id, tipoproduto_id=EXCLUDED.tipoproduto_id,' +
+    '  grupo_id=EXCLUDED.grupo_id, subgrupo_id=EXCLUDED.subgrupo_id,' +
+    '  ncm=EXCLUDED.ncm, obs=EXCLUDED.obs, erp_codigo=EXCLUDED.erp_codigo,' +
+    '  qtde_caixa=EXCLUDED.qtde_caixa, preco_maximo=EXCLUDED.preco_maximo,' +
+    '  data_inc=EXCLUDED.data_inc, usuario_i=EXCLUDED.usuario_i,' +
+    '  data_alt=EXCLUDED.data_alt, usuario_a=EXCLUDED.usuario_a,' +
+    '  data_del=EXCLUDED.data_del, usuario_d=EXCLUDED.usuario_d,' +
+    '  bloqueado=EXCLUDED.bloqueado, sync=EXCLUDED.sync,' +
+    '  sync_data=(now() at time zone ''America/Sao_Paulo'')';
+var
+  qUp: TFDQuery;
+  fs: TFormatSettings;
+  Ini: TIniFile;
+  TotalRecords, CurrentRecord: Integer;
+
+  procedure CloseActivityForm;
+  begin
+    if Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity.Close;
+      except
+      end;
+      try
+        FreeAndNil(Form_Activity);
+      except
+      end;
+    end;
+  end;
+
+  // Ajusta parâmetro DATE (quando vier como string dd/MM/yyyy)
+  procedure SetDateParam(const PName: string; F: TField);
+  var s: string; d: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDate;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType = ftDate then
+        qUp.ParamByName(PName).AsDate := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDate(s, d, fs) then
+          qUp.ParamByName(PName).AsDate := d
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
+    end;
+  end;
+
+  // Ajusta parâmetro TIMESTAMP
+  procedure SetTimestampParam(const PName: string; F: TField);
+  var s: string; dt: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDateTime;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType in [ftDateTime, ftTimeStamp] then
+        qUp.ParamByName(PName).AsDateTime := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDateTime(s, dt, fs) then
+          qUp.ParamByName(PName).AsDateTime := dt
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
+    end;
+  end;
+
+  // Converte campo varchar numérico para inteiro (grupo_id/subgrupo_id)
+  procedure SetIntFromStrParam(const PName: string; F: TField);
+  var s: string; v: Integer;
+  begin
+    qUp.ParamByName(PName).DataType := ftInteger;
+    s := Trim(F.AsString);
+    if s = '' then qUp.ParamByName(PName).Clear
+    else
+      try
+        v := StrToInt(s);
+        qUp.ParamByName(PName).AsInteger := v;
+      except
+        qUp.ParamByName(PName).Clear;
+      end;
+  end;
 begin
-  // Implementar
+  // Formato para parse dd/MM/yyyy e hh:nn:ss quando necessário
+  fs := TFormatSettings.Create;
+  fs.DateSeparator   := '/';
+  fs.ShortDateFormat := 'dd/MM/yyyy';
+  fs.TimeSeparator   := ':';
+  fs.ShortTimeFormat := 'hh:nn:ss';
+
+  FDConnectionSupabase.Connected := True;
+
+  // 1) Conectar ao SICFAR (Firebird)
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
+  finally
+    Ini.Free;
+  end;
+
+  // 2) Preparar consulta de produtos no SICFAR
+  DataSource1.DataSet := qSICFAR;
+  qSICFAR.Close;
+  qSICFAR.Connection := FDConnectionSICFAR;
+  qSICFAR.SQL.Clear;
+  qSICFAR.SQL.Add('SELECT');
+  qSICFAR.SQL.Add('  PRODUTO_ID, EMPRESA_ID, USUARIO_ID, REFERENCIA, DESCRICAO, CODBARRA,');
+  qSICFAR.SQL.Add('  IPI, ICMS, UNIDADE, PESO_BRUTO, PESO_LIQUIDO, ESTOQUE_MINIMO,');
+  qSICFAR.SQL.Add('  DELETADO, COMISSAO, ESTOQUE_ID, TIPOPRODUTO_ID, GRUPO_ID, SUBGRUPO_ID,');
+  qSICFAR.SQL.Add('  NCM, OBS, ERP_CODIGO, QTDE_CAIXA, PRECO_MAXIMO, DATA_INC, USUARIO_I,');
+  qSICFAR.SQL.Add('  DATA_ALT, USUARIO_A, DATA_DEL, USUARIO_D, BLOQUEADO, SYNC, SYNC_DATA');
+  qSICFAR.SQL.Add('FROM TBPRODUTOS');
+  qSICFAR.SQL.Add(WHERE_CLAUSE);
+  qSICFAR.SQL.Add('ORDER BY PRODUTO_ID');
+
+  // 2.1) Form de atividade
+  if not Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity := TForm_Activity.Create(Application);
+      Form_Activity.Show;
+      Form_Activity.Label_Status.Caption := 'Executando consulta...';
+      Application.ProcessMessages;
+    except
+      on E: Exception do
+      begin
+        if Assigned(Form_Activity) then
+          FreeAndNil(Form_Activity);
+        raise Exception.Create('Erro ao criar formulário de atividade: ' + E.Message);
+      end;
+    end;
+  end;
+
+  qSICFAR.Open;
+
+  try
+    TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
+      'SELECT COUNT(*) FROM TBPRODUTOS' + WHERE_CLAUSE
+    );
+  except
+    TotalRecords := -1;
+  end;
+
+  if Assigned(Form_Activity) then
+  begin
+    try
+      if TotalRecords >= 0 then
+        Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords])
+      else
+        Form_Activity.Label_Status.Caption := 'Preparando para importar...';
+      Application.ProcessMessages;
+    except
+    end;
+  end;
+  Sleep(400);
+
+  // 3) UPSERT no Supabase
+  qUp := TFDQuery.Create(nil);
+  try
+    qUp.Connection := FDConnectionSupabase;
+    qUp.SQL.Text   := SQL_UPSERT;
+
+    FDConnectionSupabase.StartTransaction;
+    try
+      qSICFAR.First;
+      CurrentRecord := 0;
+      while not qSICFAR.Eof do
+      begin
+        Inc(CurrentRecord);
+        if Assigned(Form_Activity) then
+        begin
+          try
+            if TotalRecords > 0 then
+              Form_Activity.Label_Status.Caption := Format('Importando produto %d de %d...', [CurrentRecord, TotalRecords])
+            else
+              Form_Activity.Label_Status.Caption := 'Importando produtos...';
+            Application.ProcessMessages;
+          except
+          end;
+        end;
+
+        // Mapeamento TBPRODUTOS (Firebird) -> TBPRODUTO (Supabase)
+        qUp.ParamByName('produto_id').AsInteger      := qSICFAR.FieldByName('PRODUTO_ID').AsInteger;
+        qUp.ParamByName('empresa_id').AsInteger      := qSICFAR.FieldByName('EMPRESA_ID').AsInteger;
+        qUp.ParamByName('usuario_id').AsInteger      := qSICFAR.FieldByName('USUARIO_ID').AsInteger;
+        qUp.ParamByName('referencia').AsString       := qSICFAR.FieldByName('REFERENCIA').AsString;
+        qUp.ParamByName('descricao').AsString        := qSICFAR.FieldByName('DESCRICAO').AsString;
+        qUp.ParamByName('codbarra').AsString         := qSICFAR.FieldByName('CODBARRA').AsString;
+        qUp.ParamByName('ipi').AsFloat               := qSICFAR.FieldByName('IPI').AsFloat;
+        qUp.ParamByName('icms').AsFloat              := qSICFAR.FieldByName('ICMS').AsFloat;
+        qUp.ParamByName('unidade').AsString          := qSICFAR.FieldByName('UNIDADE').AsString;
+        qUp.ParamByName('peso_bruto').AsFloat        := qSICFAR.FieldByName('PESO_BRUTO').AsFloat;
+        qUp.ParamByName('peso_liquido').AsFloat      := qSICFAR.FieldByName('PESO_LIQUIDO').AsFloat;
+        // ESTOQUE_MINIMO é integer no Firebird; Supabase aceita numeric
+        qUp.ParamByName('estoque_minimo').AsFloat    := qSICFAR.FieldByName('ESTOQUE_MINIMO').AsFloat;
+
+        qUp.ParamByName('deletado').AsString         := qSICFAR.FieldByName('DELETADO').AsString;
+        qUp.ParamByName('comissao').AsFloat          := qSICFAR.FieldByName('COMISSAO').AsFloat;
+        qUp.ParamByName('estoque_id').AsInteger      := qSICFAR.FieldByName('ESTOQUE_ID').AsInteger;
+        qUp.ParamByName('tipoproduto_id').AsInteger  := qSICFAR.FieldByName('TIPOPRODUTO_ID').AsInteger;
+        SetIntFromStrParam('grupo_id',               qSICFAR.FieldByName('GRUPO_ID'));
+        SetIntFromStrParam('subgrupo_id',            qSICFAR.FieldByName('SUBGRUPO_ID'));
+        qUp.ParamByName('ncm').AsString              := qSICFAR.FieldByName('NCM').AsString;
+        qUp.ParamByName('obs').DataType              := ftMemo; // OBS é BLOB SUB_TYPE 1 (texto)
+        qUp.ParamByName('obs').AsString              := qSICFAR.FieldByName('OBS').AsString;
+        qUp.ParamByName('erp_codigo').AsString       := qSICFAR.FieldByName('ERP_CODIGO').AsString;
+        qUp.ParamByName('qtde_caixa').AsFloat        := qSICFAR.FieldByName('QTDE_CAIXA').AsFloat;
+        qUp.ParamByName('preco_maximo').AsFloat      := qSICFAR.FieldByName('PRECO_MAXIMO').AsFloat;
+
+        SetTimestampParam('data_inc',                qSICFAR.FieldByName('DATA_INC'));
+        qUp.ParamByName('usuario_i').AsInteger       := qSICFAR.FieldByName('USUARIO_I').AsInteger;
+        SetTimestampParam('data_alt',                qSICFAR.FieldByName('DATA_ALT'));
+        qUp.ParamByName('usuario_a').AsInteger       := qSICFAR.FieldByName('USUARIO_A').AsInteger;
+        SetTimestampParam('data_del',                qSICFAR.FieldByName('DATA_DEL'));
+        qUp.ParamByName('usuario_d').AsInteger       := qSICFAR.FieldByName('USUARIO_D').AsInteger;
+
+        qUp.ParamByName('bloqueado').AsString        := qSICFAR.FieldByName('BLOQUEADO').AsString;
+        qUp.ParamByName('sync').AsString             := qSICFAR.FieldByName('SYNC').AsString;
+        // sync_data é ajustado no SQL com now() at time zone 'America/Sao_Paulo'
+
+        qUp.ExecSQL;
+
+        // Atualiza UI a cada 20 registros
+        if (CurrentRecord mod 20 = 0) then
+        begin
+          try
+            Application.ProcessMessages;
+          except
+          end;
+          Sleep(10);
+        end;
+
+        qSICFAR.Next;
+      end;
+
+      FDConnectionSupabase.Commit;
+      CloseActivityForm;
+      ShowMessage('Importação de produtos concluída com sucesso.');
+    except
+      on E: Exception do
+      begin
+        FDConnectionSupabase.Rollback;
+        CloseActivityForm;
+        raise;
+      end;
+    end;
+  finally
+    qUp.Free;
+    try if qSICFAR.Active then qSICFAR.Close; except end;
+    if FDConnectionSICFAR.Connected then FDConnectionSICFAR.Connected := False;
+  end;
 end;
 
 procedure TForm_Principal.btn_ImportarReceberClick(Sender: TObject);
