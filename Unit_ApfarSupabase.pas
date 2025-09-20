@@ -1,4 +1,5 @@
-﻿unit Unit_ApfarSupabase;
+﻿
+unit Unit_ApfarSupabase;
 
 interface
 
@@ -35,6 +36,7 @@ type
     btn_ExportaCotacao: TPanel;
     btn_ImportarLicitacaoItem: TPanel;
     btn_ImportarProduto: TPanel;
+    btn_Produto: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
@@ -45,6 +47,7 @@ type
     procedure btn_ExportaCotacaoClick(Sender: TObject);
     procedure btn_ImportarLicitacaoItemClick(Sender: TObject);
     procedure btn_ImportarProdutoClick(Sender: TObject);
+    procedure btn_ProdutoClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -215,6 +218,34 @@ var
     end;
   end;
 
+  // Mapeia o código da modalidade (MODALIDADE_ID) para sua descrição textual
+  function MapModalidadeDescricao(const AId: Integer): string;
+  begin
+    case AId of
+      1:  Result := 'Pregão Eletrônico';
+      2:  Result := 'Pregão Presencial';
+      3:  Result := 'Tomada de Preços';
+      4:  Result := 'Convite';
+      5:  Result := 'Dispensa';
+      6:  Result := 'Concorrência';
+      7:  Result := 'Inexigibilidade';
+      8:  Result := 'Leilão';
+      9:  Result := 'Concurso';
+      10: Result := 'Cotação';
+      11: Result := 'Estimativa';
+      12: Result := 'Orçamento';
+      13: Result := 'EDENIO REPRESENTAÇÕES';
+      14: Result := 'Compra Direta';
+      15: Result := 'Proposta Comercial';
+      16: Result := 'Ordem de Compra';
+      17: Result := 'BIONEXO';
+      18: Result := 'OFICIO';
+    else
+      // Valor padrão quando o código não corresponde à tabela
+      Result := 'Não Informada';
+    end;
+  end;
+
 begin
   // formato para parse dd/MM/yyyy (somente se o SQL retornar texto)
   fs := TFormatSettings.Create;
@@ -378,6 +409,9 @@ begin
         qUp.ParamByName('portaria').AsString           := qSICFAR.FieldByName('PORTARIA').AsString;
         qUp.ParamByName('portaria_ano').AsString       := qSICFAR.FieldByName('PORTARIA_ANO').AsString;
         qUp.ParamByName('modalidade_id').AsInteger     := qSICFAR.FieldByName('MODALIDADE_ID').AsInteger;
+
+        qUp.ParamByName('modalidade').AsString         := MapModalidadeDescricao(qSICFAR.FieldByName('MODALIDADE_ID').AsInteger);
+
         qUp.ParamByName('modalidade_numero').AsString  := qSICFAR.FieldByName('MODALIDADE_NUMERO').AsString;
         qUp.ParamByName('modalidade_ano').AsString     := qSICFAR.FieldByName('MODALIDADE_ANO').AsString;
         qUp.ParamByName('objeto_id').AsInteger         := qSICFAR.FieldByName('OBJETO_ID').AsInteger;
@@ -423,7 +457,6 @@ begin
 
         // Campos adicionais no Supabase que não existem no Firebird
         qUp.ParamByName('objeto').AsString := '';
-        qUp.ParamByName('modalidade').AsString := '';
         qUp.ParamByName('usuarionome_i').AsString := qSICFAR.FieldByName('USUARIONOME_I').AsString;
         qUp.ParamByName('usuarionome_a').AsString := qSICFAR.FieldByName('USUARIONOME_A').AsString;
         qUp.ParamByName('usuarionome_d').AsString := qSICFAR.FieldByName('USUARIONOME_D').AsString;
@@ -1371,6 +1404,18 @@ begin
     SQL.Add(' SE1.E1_NUM titulo, SE1.E1_PREFIXO prefixo, SE1.E1_TIPO tipo, SE1.E1_SALDO saldo,');
     SQL.Add(' SE1.E1_VALOR valor, SE1.E1_VALOR - SE1.E1_SALDO valor_pago,');
     SQL.Add(' CASE WHEN SE1.E1_VENCREA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_VENCREA AS DATETIME),103)  END AS vencimento,');
+    SQL.Add(' SE1.E1_VENCREA emissao,');
+    SQL.Add(' CASE WHEN SE1.E1_BAIXA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA AS DATETIME),103)  END AS data_baixa,');
+    SQL.Add(' SA1.A1_NOME cliente,');
+    SQL.Add(' SA1.A1_MUNICIPIO cidade,');
+    SQL.Add(' SA1.A1_ESTADO uf,');
+    SQL.Add(' SA1.A1_COD erp_cliente,');
+    SQL.Add(' SE1.E1_OBS obs,');
+    SQL.Add(' SA1.A1_END endereco,');
+    SQL.Add(' SA1.A1_CEP cep,');
+    SQL.Add(' SA1.A1_CGC_CPF cnpj,');
+    SQL.Add(' SA1.A1_TELEFONE telefone,');
+//    SQL.Add(' CASE WHEN SE1
     SQL.Add(' CASE WHEN SE1.E1_EMISSAO <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_EMISSAO AS DATETIME),103) END AS emissao,');
     SQL.Add(' CASE WHEN SE1.E1_BAIXA   <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA AS DATETIME),103)   END AS data_baixa,');
     SQL.Add(' RTRIM(SA1.A1_NOME) cliente,');
@@ -1530,6 +1575,254 @@ begin
     end;
   finally
     qUp.Free;
+  end;
+end;
+
+procedure TForm_Principal.btn_ProdutoClick(Sender: TObject);
+const
+  // Filtrar somente produtos não deletados
+  WHERE_CLAUSE = ' WHERE deletado = ''N'' and subgrupo_id = ''07'' ';
+
+  SQL_UPSERT =
+    'INSERT INTO public.tbproduto (' +
+    '  produto_id, empresa_id, usuario_id, referencia, descricao, codbarra, ' +
+    '  ipi, icms, unidade, peso_bruto, peso_liquido, estoque_minimo, ' +
+    '  deletado, comissao, estoque_id, tipoproduto_id, grupo_id, subgrupo_id, ' +
+    '  ncm, obs, erp_codigo, qtde_caixa, preco_maximo, data_inc, usuario_i, ' +
+    '  data_alt, usuario_a, data_del, usuario_d, bloqueado, sync, sync_data' +
+    ') VALUES (' +
+    '  :produto_id, :empresa_id, :usuario_id, :referencia, :descricao, :codbarra, ' +
+    '  :ipi, :icms, :unidade, :peso_bruto, :peso_liquido, :estoque_minimo, ' +
+    '  :deletado, :comissao, :estoque_id, :tipoproduto_id, :grupo_id, :subgrupo_id, ' +
+    '  :ncm, :obs, :erp_codigo, :qtde_caixa, :preco_maximo, :data_inc, :usuario_i, ' +
+    '  :data_alt, :usuario_a, :data_del, :usuario_d, :bloqueado, :sync, (now() at time zone ''America/Sao_Paulo'')' +
+    ') ON CONFLICT (produto_id) DO UPDATE SET ' +
+    '  empresa_id=EXCLUDED.empresa_id, usuario_id=EXCLUDED.usuario_id, ' +
+    '  referencia=EXCLUDED.referencia, descricao=EXCLUDED.descricao, ' +
+    '  codbarra=EXCLUDED.codbarra, ipi=EXCLUDED.ipi, icms=EXCLUDED.icms, ' +
+    '  unidade=EXCLUDED.unidade, peso_bruto=EXCLUDED.peso_bruto, ' +
+    '  peso_liquido=EXCLUDED.peso_liquido, estoque_minimo=EXCLUDED.estoque_minimo, ' +
+    '  deletado=EXCLUDED.deletado, comissao=EXCLUDED.comissao, ' +
+    '  estoque_id=EXCLUDED.estoque_id, tipoproduto_id=EXCLUDED.tipoproduto_id, ' +
+    '  grupo_id=EXCLUDED.grupo_id, subgrupo_id=EXCLUDED.subgrupo_id, ' +
+    '  ncm=EXCLUDED.ncm, obs=EXCLUDED.obs, erp_codigo=EXCLUDED.erp_codigo, ' +
+    '  qtde_caixa=EXCLUDED.qtde_caixa, preco_maximo=EXCLUDED.preco_maximo, ' +
+    '  data_inc=EXCLUDED.data_inc, usuario_i=EXCLUDED.usuario_i, ' +
+    '  data_alt=EXCLUDED.data_alt, usuario_a=EXCLUDED.usuario_a, ' +
+    '  data_del=EXCLUDED.data_del, usuario_d=EXCLUDED.usuario_d, ' +
+    '  bloqueado=EXCLUDED.bloqueado, sync=EXCLUDED.sync, ' +
+    '  sync_data=(now() at time zone ''America/Sao_Paulo'')';
+
+var
+  qUp: TFDQuery;
+  fs: TFormatSettings;
+  Ini: TIniFile;
+  TotalRecords, CurrentRecord: Integer;
+  grpInt, subgrpInt: Integer;
+  s: string;
+
+  procedure CloseActivityForm;
+  begin
+    if Assigned(Form_Activity) then
+    begin
+      try
+        Form_Activity.Close;
+      except
+        // Ignora erros de fechamento
+      end;
+      try
+        FreeAndNil(Form_Activity);
+      except
+        // Ignora erros de liberação
+      end;
+    end;
+  end;
+
+  procedure SetTimestampParam(const PName: string; F: TField);
+  var sdt: string; dt: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDateTime;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else if F.DataType in [ftDateTime, ftTimeStamp, ftDate] then
+      qUp.ParamByName(PName).AsDateTime := F.AsDateTime
+    else
+    begin
+      sdt := Trim(F.AsString);
+      if (sdt = '') or (not TryStrToDateTime(sdt, dt, fs)) then
+        qUp.ParamByName(PName).Clear
+      else
+        qUp.ParamByName(PName).AsDateTime := dt;
+    end;
+  end;
+
+begin
+  // Formatação para parse de datas/texto quando vier como string
+  fs := TFormatSettings.Create;
+  fs.DateSeparator   := '/';
+  fs.ShortDateFormat := 'dd/MM/yyyy';
+  fs.TimeSeparator   := ':';
+  fs.ShortTimeFormat := 'hh:nn:ss';
+
+  FDConnectionSupabase.Connected := True;
+
+  // 1) Configurar conexão SICFAR (Firebird) via INI
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
+  finally
+    Ini.Free;
+  end;
+
+  // 2) Preparar consulta de origem (TBPRODUTOS)
+  DataSource1.DataSet := qSICFAR;
+  qSICFAR.Close;
+  qSICFAR.Connection := FDConnectionSICFAR;
+  qSICFAR.SQL.Clear;
+  qSICFAR.SQL.Add('select');
+  qSICFAR.SQL.Add('  p.produto_id, p.empresa_id, p.usuario_id, p.referencia, p.descricao,');
+  qSICFAR.SQL.Add('  p.codbarra, p.ipi, p.icms, p.unidade, p.peso_bruto, p.peso_liquido,');
+  qSICFAR.SQL.Add('  p.estoque_minimo, p.deletado, p.comissao, p.estoque_id, p.tipoproduto_id,');
+  qSICFAR.SQL.Add('  p.grupo_id, p.subgrupo_id, p.ncm, p.obs, p.erp_codigo, p.qtde_caixa,');
+  qSICFAR.SQL.Add('  p.preco_maximo, p.data_inc, p.usuario_i, p.data_alt, p.usuario_a,');
+  qSICFAR.SQL.Add('  p.data_del, p.usuario_d, p.bloqueado, p.sync, p.sync_data');
+  qSICFAR.SQL.Add('from tbprodutos p');
+  qSICFAR.SQL.Add(WHERE_CLAUSE);
+
+  // Exibir Form de atividade e contar registros
+  if not Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity := TForm_Activity.Create(Application);
+      Form_Activity.Show;
+      Form_Activity.Label_Status.Caption := 'Executando consulta...';
+      Application.ProcessMessages;
+    except
+      on E: Exception do
+      begin
+        if Assigned(Form_Activity) then
+          FreeAndNil(Form_Activity);
+        raise Exception.Create('Erro ao criar formulário de atividade: ' + E.Message);
+      end;
+    end;
+  end;
+
+  qSICFAR.Open;
+
+  TotalRecords := FDConnectionSICFAR.ExecSQLScalar(
+    'SELECT COUNT(*) FROM TBPRODUTOS' + WHERE_CLAUSE
+  );
+
+  if Assigned(Form_Activity) then
+  begin
+    try
+      Form_Activity.Label_Status.Caption := Format('Preparando para importar... %d registros encontrados.', [TotalRecords]);
+      Application.ProcessMessages;
+    except
+      // Ignora erros na interface
+    end;
+  end;
+  Sleep(500);
+
+  // 3) Prepara o UPSERT no Supabase
+  qUp := TFDQuery.Create(nil);
+  try
+    qUp.Connection := FDConnectionSupabase;
+    qUp.SQL.Text   := SQL_UPSERT;
+
+    FDConnectionSupabase.StartTransaction;
+    try
+      qSICFAR.First;
+      CurrentRecord := 0;
+      while not qSICFAR.Eof do
+      begin
+        Inc(CurrentRecord);
+
+        if Assigned(Form_Activity) then
+        begin
+          try
+            Form_Activity.Label_Status.Caption := Format('Importando registro %d de %d...', [CurrentRecord, TotalRecords]);
+            Application.ProcessMessages;
+          except
+            // Ignora erros na interface
+          end;
+        end;
+
+        // Mapeamento Firebird (TBPRODUTOS) -> Supabase (TBPRODUTO)
+        qUp.ParamByName('produto_id').AsInteger     := qSICFAR.FieldByName('PRODUTO_ID').AsInteger;
+        qUp.ParamByName('empresa_id').AsInteger     := qSICFAR.FieldByName('EMPRESA_ID').AsInteger;
+        qUp.ParamByName('usuario_id').AsInteger     := qSICFAR.FieldByName('USUARIO_ID').AsInteger;
+        qUp.ParamByName('referencia').AsString      := qSICFAR.FieldByName('REFERENCIA').AsString;
+        qUp.ParamByName('descricao').AsString       := qSICFAR.FieldByName('DESCRICAO').AsString;
+        qUp.ParamByName('codbarra').AsString        := qSICFAR.FieldByName('CODBARRA').AsString;
+        qUp.ParamByName('ipi').AsFloat              := qSICFAR.FieldByName('IPI').AsFloat;
+        qUp.ParamByName('icms').AsFloat             := qSICFAR.FieldByName('ICMS').AsFloat;
+        qUp.ParamByName('unidade').AsString         := qSICFAR.FieldByName('UNIDADE').AsString;
+        qUp.ParamByName('peso_bruto').AsFloat       := qSICFAR.FieldByName('PESO_BRUTO').AsFloat;
+        qUp.ParamByName('peso_liquido').AsFloat     := qSICFAR.FieldByName('PESO_LIQUIDO').AsFloat;
+        qUp.ParamByName('estoque_minimo').AsFloat   := qSICFAR.FieldByName('ESTOQUE_MINIMO').AsFloat;
+        qUp.ParamByName('deletado').AsString        := qSICFAR.FieldByName('DELETADO').AsString;
+        qUp.ParamByName('comissao').AsFloat         := qSICFAR.FieldByName('COMISSAO').AsFloat;
+        qUp.ParamByName('estoque_id').AsInteger     := qSICFAR.FieldByName('ESTOQUE_ID').AsInteger;
+        qUp.ParamByName('tipoproduto_id').AsInteger := qSICFAR.FieldByName('TIPOPRODUTO_ID').AsInteger;
+
+        // GRUPO_ID e SUBGRUPO_ID são VARCHAR no Firebird e INTEGER no Supabase
+        s := Trim(qSICFAR.FieldByName('GRUPO_ID').AsString);
+        if TryStrToInt(s, grpInt) then qUp.ParamByName('grupo_id').AsInteger := grpInt
+        else qUp.ParamByName('grupo_id').Clear;
+
+        s := Trim(qSICFAR.FieldByName('SUBGRUPO_ID').AsString);
+        if TryStrToInt(s, subgrpInt) then qUp.ParamByName('subgrupo_id').AsInteger := subgrpInt
+        else qUp.ParamByName('subgrupo_id').Clear;
+
+        qUp.ParamByName('ncm').AsString             := qSICFAR.FieldByName('NCM').AsString;
+        qUp.ParamByName('obs').AsString             := qSICFAR.FieldByName('OBS').AsString;
+        qUp.ParamByName('erp_codigo').AsString      := qSICFAR.FieldByName('ERP_CODIGO').AsString;
+        qUp.ParamByName('qtde_caixa').AsFloat       := qSICFAR.FieldByName('QTDE_CAIXA').AsFloat;
+        qUp.ParamByName('preco_maximo').AsFloat     := qSICFAR.FieldByName('PRECO_MAXIMO').AsFloat;
+
+        SetTimestampParam('data_inc', qSICFAR.FieldByName('DATA_INC'));
+        qUp.ParamByName('usuario_i').AsInteger      := qSICFAR.FieldByName('USUARIO_I').AsInteger;
+        SetTimestampParam('data_alt', qSICFAR.FieldByName('DATA_ALT'));
+        qUp.ParamByName('usuario_a').AsInteger      := qSICFAR.FieldByName('USUARIO_A').AsInteger;
+        SetTimestampParam('data_del', qSICFAR.FieldByName('DATA_DEL'));
+        qUp.ParamByName('usuario_d').AsInteger      := qSICFAR.FieldByName('USUARIO_D').AsInteger;
+        qUp.ParamByName('bloqueado').AsString       := qSICFAR.FieldByName('BLOQUEADO').AsString;
+        qUp.ParamByName('sync').AsString            := qSICFAR.FieldByName('SYNC').AsString;
+
+        qUp.ExecSQL;
+
+        // Atualizações de UI e respiração de CPU a cada 10 registros
+        if CurrentRecord mod 10 = 0 then
+        begin
+          try
+            Application.ProcessMessages;
+          except
+            // Ignora erros no ProcessMessages
+          end;
+          Sleep(10);
+        end;
+
+        qSICFAR.Next;
+      end;
+
+      FDConnectionSupabase.Commit;
+      CloseActivityForm;
+      ShowMessage('Importação de produtos concluída com sucesso.');
+    except
+      on E: Exception do
+      begin
+        FDConnectionSupabase.Rollback;
+        CloseActivityForm;
+        raise;
+      end;
+    end;
+  finally
+    qUp.Free;
+    if qSICFAR.Active then qSICFAR.Close;
+    if FDConnectionSICFAR.Connected then FDConnectionSICFAR.Connected := False;
   end;
 end;
 
@@ -1794,14 +2087,14 @@ begin
         qUp.ParamByName('complemento').AsString := qSICFAR.FieldByName('COMPLEMENTO').AsString;
         qUp.ParamByName('bairro').AsString := qSICFAR.FieldByName('BAIRRO').AsString;
         qUp.ParamByName('cidade_id').AsInteger := qSICFAR.FieldByName('CIDADE_ID').AsInteger;
-        
+
         // Campo CIDADE não está no SELECT; enviar nulo (definir DataType explícito)
         qUp.ParamByName('cidade').DataType := ftString;
         qUp.ParamByName('cidade').Clear;
 
         qUp.ParamByName('uf').AsString := qSICFAR.FieldByName('UF').AsString;
         qUp.ParamByName('cep').AsString := qSICFAR.FieldByName('CEP').AsString;
-        
+
         // Campo PESSOA_VR não está no SELECT; enviar nulo (definir DataType explícito para evitar erro do FireDAC)
         qUp.ParamByName('vendedor_id').DataType := ftInteger;
         qUp.ParamByName('vendedor_id').Clear;
@@ -1937,44 +2230,44 @@ begin
     * implementação. Consulte docs/campos-nao-mapeados-tbcliente.md para      *
     * documentação completa e sugestões de implementação futura.            *
     **************************************************************************
-    
+
     // Endereços Adicionais
     // ENT_NOME, ENT_ENDERECO, ENT_BAIRRO, ENT_CIDADE, ENT_UF, ENT_FONE
-    
+
     // Telefones Múltiplos
     // FONE_01, FONE_02, FONE_03, FONE_04, WHATSAPP
-    
+
     // Referências Comerciais
     // REF_01NOME, REF_02NOME, REF_03NOME, REF_01FONE, REF_02FONE, REF_03FONE
-    
+
     // Endereço de Cobrança
     // COB_ENDERECO, COB_BAIRRO, COB_CIDADE, COB_UF, COB_CEP
-    
+
     // Datas Específicas
     // DATACADASTRO, ALTERADO, DATA_CONVERSAO, DATA_MEMBRO, DATA_AFASTADO
     // DATA_EXAME, PROXIMO_EXAME
-    
+
     // Veículos/Transporte
     // TIPO_TRANSP, CODIGO_ANTT
-    
+
     // Recibos e Contratos
     // REC_CONTRATO, REC_CONTRATO_DATA, REC_DIMOB, REC_DIMOB_DATA
-    
+
     // Contribuição
     // VALOR_CONTRIBUICAO, CAPTADOR, CONTRIBUINTE
-    
+
     // Deficiência
     // DEFICIENCIA, TIPO_DEFICIENCIA
-    
+
     // Contrato de Trabalho
     // CONTRATO_EXPERIENCIA, APRENDIZ, PRIMEIRO_EMPREGO
-    
+
     // OPF e Outros
     // OPF, OPF_DESCRICAO, MES_VENCIMENTO, DIA_FATURA
-    
+
     // Sistema/Controle
     // IDSOFT, REPLICADO, ID_OLD, RECNO
-    
+
     // Outros campos diversos
     // CLASSES, DATACADASTRO, ALTERADO, TIPO_TRANSP, CODIGO_ANTT, CONTABIL
     // MEMBRO, EQUIPE_ID, DATA_CONVERSAO, DATA_MEMBRO, EMPREGADO, DOM_ID
@@ -1985,7 +2278,7 @@ begin
     // DEPARTAMENTO_ID, DEPARTAMENTO, COMPRAS, FUNCIONARIOS
     // DEPARTAMENTO_ID_SEG, DEPARTAMENTO_SEG, ULTIMA_COMPRA, BLOQUEADO
     // CONTATORH_ID, CONTATORH, DIA_FATURA, PIS, SETOR, SALARIO
-    
+
     **************************************************************************
   }
 end;

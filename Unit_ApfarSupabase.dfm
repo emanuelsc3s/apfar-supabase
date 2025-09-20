@@ -164,11 +164,11 @@ object Form_Principal: TForm_Principal
   object btn_ImportarLicitacaoItem: TPanel
     Left = 483
     Top = 351
-    Width = 120
+    Width = 142
     Height = 35
     Cursor = crHandPoint
     BevelOuter = bvNone
-    Caption = 'Imp. Licita'#231#227'o'
+    Caption = 'Imp. Item Licita'#231#227'o'
     Color = 12477460
     Font.Charset = ANSI_CHARSET
     Font.Color = clWhite
@@ -181,7 +181,7 @@ object Form_Principal: TForm_Principal
     OnClick = btn_ImportarLicitacaoItemClick
   end
   object btn_ImportarProduto: TPanel
-    Left = 609
+    Left = 631
     Top = 351
     Width = 120
     Height = 35
@@ -198,6 +198,25 @@ object Form_Principal: TForm_Principal
     ParentFont = False
     TabOrder = 9
     OnClick = btn_ImportarProdutoClick
+  end
+  object btn_Produto: TPanel
+    Left = 155
+    Top = 351
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Imp. Produto'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 10
+    OnClick = btn_ProdutoClick
   end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (
