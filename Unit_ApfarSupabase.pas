@@ -50,6 +50,7 @@ type
     procedure btn_ProdutoClick(Sender: TObject);
   private
     { Private declarations }
+    procedure pImportaClienteSA1(prCodCliente: string);
   public
     { Public declarations }
   end;
@@ -2334,6 +2335,264 @@ begin
     FDConnectionSupabase.Connected := True;
   except
     on E: Exception do ShowMessage('Erro: ' + E.Message);
+  end;
+end;
+
+procedure TForm_Principal.pImportaClienteSA1(prCodCliente: string);
+var
+  Ini: TIniFile;
+  qChk, qUp: TFDQuery;
+  vExists: Boolean;
+  vCidadeId: Integer;
+  vNascimento: TDateTime;
+  s: string;
+
+  function SA1Str(const AField: string): string;
+  begin
+    if qTOTVS.FieldByName(AField).IsNull then Result := ''
+    else Result := Trim(qTOTVS.FieldByName(AField).AsString);
+  end;
+
+  function SA1Date(const AField: string; out ADate: TDateTime): Boolean;
+  var
+    txt: string; y, m, d: Word;
+  begin
+    Result := False;
+    ADate := 0;
+    if qTOTVS.FieldByName(AField).IsNull then Exit;
+    // Datas do Protheus geralmente vêm como 'yyyymmdd' (char)
+    txt := Trim(qTOTVS.FieldByName(AField).AsString);
+    if Length(txt) = 8 then
+    begin
+      try
+        y := StrToInt(Copy(txt, 1, 4));
+        m := StrToInt(Copy(txt, 5, 2));
+        d := StrToInt(Copy(txt, 7, 2));
+        ADate := EncodeDate(y, m, d);
+        Result := True;
+        Exit;
+      except
+        Result := False;
+      end;
+    end;
+    // Caso o driver já entregue como date/datetime
+    try
+      ADate := qTOTVS.FieldByName(AField).AsDateTime;
+      Result := (ADate > 0);
+    except
+      Result := False;
+    end;
+  end;
+
+  function TryToInt(const AValue: string; out AInt: Integer): Boolean;
+  begin
+    Result := False;
+    AInt := 0;
+    if Trim(AValue) = '' then Exit;
+    try
+      AInt := StrToInt(Trim(AValue));
+      Result := True;
+    except
+      Result := False;
+    end;
+  end;
+
+  procedure MapCommonParams(const Up: TFDQuery; const IsInsert: Boolean);
+  begin
+    // Texto
+    Up.ParamByName('erp_codigo').AsString     := SA1Str('A1_COD');
+    Up.ParamByName('nome').AsString           := SA1Str('A1_NOME');
+    Up.ParamByName('nome_pupular').AsString   := SA1Str('A1_NREDUZ');
+    Up.ParamByName('endereco').AsString       := SA1Str('A1_END');
+    Up.ParamByName('bairro').AsString         := SA1Str('A1_BAIRRO');
+    Up.ParamByName('cep').AsString            := SA1Str('A1_CEP');
+    Up.ParamByName('cidade').AsString         := SA1Str('A1_MUN');
+    Up.ParamByName('uf').AsString             := SA1Str('A1_EST');
+    Up.ParamByName('cpf_cnpj').AsString       := SA1Str('A1_CGC');
+    Up.ParamByName('rg_cgf').AsString         := SA1Str('A1_INSCR');
+    Up.ParamByName('suframa').AsString        := SA1Str('A1_SUFRAMA');
+    Up.ParamByName('obs').AsString            := SA1Str('A1_OBSERV');
+
+    // tipo (PF/PJ) a partir de A1_PESSOA (F/J)
+    s := UpperCase(SA1Str('A1_PESSOA'));
+    if s = 'F' then Up.ParamByName('tipo').AsString := 'Pessoa Física'
+    else if s = 'J' then Up.ParamByName('tipo').AsString := 'Pessoa Jurídica'
+    else Up.ParamByName('tipo').AsString := s;
+
+    // numérico
+    Up.ParamByName('limite_credito').AsFloat := qTOTVS.FieldByName('A1_LC').AsFloat;
+    Up.ParamByName('comissao').AsFloat       := qTOTVS.FieldByName('A1_COMIS').AsFloat;
+
+    Up.ParamByName('cidade_id').DataType := ftInteger;
+    Up.ParamByName('cidade_id').Clear;
+
+    // nascimento
+    Up.ParamByName('nascimento').DataType := ftDate;
+    if SA1Date('A1_DTNASC', vNascimento) then
+      Up.ParamByName('nascimento').AsDate := vNascimento
+    else
+      Up.ParamByName('nascimento').Clear;
+
+    Up.ParamByName('complemento').DataType := ftString;
+    Up.ParamByName('complemento').AsString := SA1Str('A1_COMPLEM');
+
+    Up.ParamByName('email').DataType     := ftString;
+    Up.ParamByName('email').AsString     := SA1Str('A1_EMAIL');
+
+    Up.ParamByName('numero').DataType    := ftInteger;
+    Up.ParamByName('numero').Clear;
+
+    Up.ParamByName('usuario_i').DataType  := ftInteger;
+    Up.ParamByName('usuario_i').AsInteger := 1;
+
+    Up.ParamByName('deletado').AsString  := 'N';
+    Up.ParamByName('sync').AsString      := 'S';
+
+    Up.ParamByName('sync_data').DataType   := ftDateTime;
+    Up.ParamByName('sync_data').AsDateTime := Now;
+
+    // campos opcionais sem mapeamento direto -> NULL
+    if IsInsert then
+      begin
+        // auditoria/sync
+        Up.ParamByName('data_inc').DataType   := ftDateTime;
+        Up.ParamByName('data_inc').AsDateTime := Now;
+      end
+    else
+      begin
+        // Para UPDATE
+        Up.ParamByName('usuario_a').DataType  := ftInteger;
+        Up.ParamByName('usuario_a').AsInteger := 1;
+
+        Up.ParamByName('data_alt').DataType   := ftDateTime;
+        Up.ParamByName('data_alt').AsDateTime := Now;
+      end;
+  end;
+begin
+  // Sem interface visual: operação unitária (um cliente A1_COD)
+  if Trim(prCodCliente) = '' then Exit;
+
+  // Garantir Supabase conectado
+  FDConnectionSupabase.Connected := True;
+
+  // Conectar TOTVS (SQL Server)
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionTOTVS, 'Protheus');
+  finally
+    Ini.Free;
+  end;
+
+  // Buscar no SA1
+  qTOTVS.Close;
+  qTOTVS.Connection := FDConnectionTOTVS;
+  qTOTVS.SQL.Clear;
+  qTOTVS.SQL.Add('SELECT TOP 1');
+  qTOTVS.SQL.Add('  A1_COD, A1_NOME, A1_NREDUZ, A1_END, A1_BAIRRO, A1_CEP, A1_MUN, A1_EST,');
+  qTOTVS.SQL.Add('  A1_CGC, A1_INSCR, A1_DTNASC, A1_SUFRAMA, A1_VEND, A1_LC, A1_COMIS,');
+  qTOTVS.SQL.Add('  A1_PESSOA, A1_TIPO, A1_COD_MUN, A1_IBGE, A1_OBSERV');
+  qTOTVS.SQL.Add('FROM SA1010 (NOLOCK)');
+  qTOTVS.SQL.Add('WHERE D_E_L_E_T_ = ''''');
+
+  qTOTVS.SQL.Add('  AND A1_COD = :pCod');
+
+  qTOTVS.ParamByName('pCod').AsString := prCodCliente;
+
+  qTOTVS.Open;
+
+  if qTOTVS.IsEmpty then
+    Exit; // nada a importar
+
+  // Verificar existência no Supabase por erp_codigo
+  qChk := TFDQuery.Create(nil);
+  qUp  := TFDQuery.Create(nil);
+  try
+    qChk.Connection := FDConnectionSupabase;
+    qChk.SQL.Text := 'SELECT cliente_id FROM public.tbcliente WHERE erp_codigo = :erp_codigo LIMIT 1';
+    qChk.ParamByName('erp_codigo').AsString := SA1Str('A1_COD');
+    qChk.Open;
+    vExists := not qChk.IsEmpty;
+
+    qUp.Connection := FDConnectionSupabase;
+
+    if vExists then
+    begin
+      // UPDATE por erp_codigo
+      qUp.SQL.Clear;
+      qUp.SQL.Add('UPDATE public.tbcliente SET');
+      qUp.SQL.Add('  nome = :nome,');
+      qUp.SQL.Add('  nome_pupular = :nome_pupular,');
+      qUp.SQL.Add('  endereco = :endereco,');
+      qUp.SQL.Add('  bairro = :bairro,');
+      qUp.SQL.Add('  cidade = :cidade,');
+      qUp.SQL.Add('  cidade_id = :cidade_id,');
+      qUp.SQL.Add('  uf = :uf,');
+      qUp.SQL.Add('  cep = :cep,');
+      qUp.SQL.Add('  vendedor_id = :vendedor_id,');
+      qUp.SQL.Add('  nascimento = :nascimento,');
+      qUp.SQL.Add('  tipo = :tipo,');
+      qUp.SQL.Add('  cpf_cnpj = :cpf_cnpj,');
+      qUp.SQL.Add('  rg_cgf = :rg_cgf,');
+      qUp.SQL.Add('  obs = :obs,');
+      qUp.SQL.Add('  limite_credito = :limite_credito,');
+      qUp.SQL.Add('  comissao = :comissao,');
+      qUp.SQL.Add('  situacao = :situacao,');
+      qUp.SQL.Add('  suframa = :suframa,');
+      qUp.SQL.Add('  sync = :sync,');
+      qUp.SQL.Add('  data_alt = (now() at time zone ''America/Sao_Paulo''),');
+      qUp.SQL.Add('  sync_data = (now() at time zone ''America/Sao_Paulo'')');
+      qUp.SQL.Add('WHERE erp_codigo = :erp_codigo');
+
+      FDConnectionSupabase.StartTransaction;
+      try
+        MapCommonParams(qUp, False);
+        qUp.ParamByName('erp_codigo').AsString := SA1Str('A1_COD');
+        qUp.ExecSQL;
+        FDConnectionSupabase.Commit;
+      except
+        on E: Exception do
+        begin
+          FDConnectionSupabase.Rollback;
+          raise;
+        end;
+      end;
+    end
+    else
+    begin
+      // INSERT (sem cliente_id, deixando o default/sequence do banco)
+      qUp.SQL.Clear;
+      qUp.SQL.Add('INSERT INTO public.tbcliente (');
+      qUp.SQL.Add('  nome_pupular, nome, endereco, complemento, bairro, cidade_id, uf, cep,');
+      qUp.SQL.Add('  vendedor_id, naturalidade, nascimento, sexo, tipo, cpf_cnpj, rg_cgf,');
+      qUp.SQL.Add('  estcivil, obs, pai, mae, limite_credito, conjuge, comissao, situacao,');
+      qUp.SQL.Add('  deletado, email, site, numero, suframa, pais_id, data_inc, usuario_i,');
+      qUp.SQL.Add('  erp_codigo, sync, sync_data, cidade');
+      qUp.SQL.Add(') VALUES (');
+      qUp.SQL.Add('  :nome_pupular, :nome, :endereco, :complemento, :bairro, :cidade_id, :uf, :cep,');
+      qUp.SQL.Add('  :vendedor_id, :naturalidade, :nascimento, :sexo, :tipo, :cpf_cnpj, :rg_cgf,');
+      qUp.SQL.Add('  :estcivil, :obs, :pai, :mae, :limite_credito, :conjuge, :comissao, :situacao,');
+      qUp.SQL.Add('  :deletado, :email, :site, :numero, :suframa, :pais_id, :data_inc, :usuario_i,');
+      qUp.SQL.Add('  :erp_codigo, :sync, (now() at time zone ''America/Sao_Paulo''), :cidade');
+      qUp.SQL.Add(')');
+
+      FDConnectionSupabase.StartTransaction;
+      try
+        MapCommonParams(qUp, True);
+        qUp.ExecSQL;
+        FDConnectionSupabase.Commit;
+      except
+        on E: Exception do
+        begin
+          FDConnectionSupabase.Rollback;
+          raise;
+        end;
+      end;
+    end;
+  finally
+    qChk.Free;
+    qUp.Free;
   end;
 end;
 
