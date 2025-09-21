@@ -187,7 +187,7 @@ object Form_Principal: TForm_Principal
     Height = 35
     Cursor = crHandPoint
     BevelOuter = bvNone
-    Caption = 'Imp. Receber'
+    Caption = 'Imp. Produto'
     Color = 12477460
     Font.Charset = ANSI_CHARSET
     Font.Color = clWhite
