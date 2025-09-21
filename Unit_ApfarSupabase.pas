@@ -2351,6 +2351,7 @@ procedure TForm_Principal.pImportaClienteSA1(prCodCliente: string);
 var
   Ini: TIniFile;
   qUp: TFDQuery;
+  fs: TFormatSettings;
   vNascimento: TDateTime;
   s: string;
 
@@ -2388,6 +2389,28 @@ var
       Result := (ADate > 0);
     except
       Result := False;
+    end;
+  end;
+
+  procedure SetDateParam(const PName: string; F: TField);
+  var s: string; d: TDateTime;
+  begin
+    qUp.ParamByName(PName).DataType := ftDate;
+    if F.IsNull then
+      qUp.ParamByName(PName).Clear
+    else
+    begin
+      if F.DataType = ftDate then
+        qUp.ParamByName(PName).AsDate := F.AsDateTime
+      else
+      begin
+        s := Trim(F.AsString);
+        if s = '' then qUp.ParamByName(PName).Clear
+        else if TryStrToDate(s, d, fs) then
+          qUp.ParamByName(PName).AsDate := d
+        else
+          qUp.ParamByName(PName).Clear;
+      end;
     end;
   end;
 
@@ -2614,6 +2637,8 @@ begin
       qUp.ParamByName('renda_conjuge').DataType := ftFloat;     qUp.ParamByName('renda_conjuge').Clear;
 
       // String
+      qUp.ParamByName('situacao').DataType := ftString;         qUp.ParamByName('situacao').Clear;
+
       qUp.ParamByName('naturalidade').DataType := ftString;     qUp.ParamByName('naturalidade').Clear;
       qUp.ParamByName('sexo').DataType := ftString;             qUp.ParamByName('sexo').Clear;
       qUp.ParamByName('estcivil').DataType := ftString;         qUp.ParamByName('estcivil').Clear;
@@ -2649,6 +2674,7 @@ begin
       qUp.ParamByName('grau_instrucao').DataType := ftString;   qUp.ParamByName('grau_instrucao').Clear;
 
       // Datas (DATE) e Timestamps (DATETIME)
+      qUp.ParamByName('ctps_emissao').DataType := ftDate;       qUp.ParamByName('ctps_emissao').Clear;
       qUp.ParamByName('data_batismo').DataType := ftDate;       qUp.ParamByName('data_batismo').Clear;
       qUp.ParamByName('nascimento_conjuge').DataType := ftDate; qUp.ParamByName('nascimento_conjuge').Clear;
       qUp.ParamByName('cnh_emissao').DataType := ftDate;        qUp.ParamByName('cnh_emissao').Clear;
