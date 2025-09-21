@@ -218,6 +218,15 @@ object Form_Principal: TForm_Principal
     TabOrder = 10
     OnClick = btn_ProdutoClick
   end
+  object Button1: TButton
+    Left = 780
+    Top = 358
+    Width = 75
+    Height = 25
+    Caption = 'Button1'
+    TabOrder = 11
+    OnClick = Button1Click
+  end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (
       'Server=aws-0-sa-east-1.pooler.supabase.com'

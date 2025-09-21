@@ -37,6 +37,7 @@ type
     btn_ImportarLicitacaoItem: TPanel;
     btn_ImportarProduto: TPanel;
     btn_Produto: TPanel;
+    Button1: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
@@ -48,6 +49,7 @@ type
     procedure btn_ImportarLicitacaoItemClick(Sender: TObject);
     procedure btn_ImportarProdutoClick(Sender: TObject);
     procedure btn_ProdutoClick(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
     procedure pImportaClienteSA1(prCodCliente: string);
@@ -1827,6 +1829,13 @@ begin
   end;
 end;
 
+procedure TForm_Principal.Button1Click(Sender: TObject);
+begin
+  pImportaClienteSA1('000256');
+
+  ShowMessage('OK');
+end;
+
 procedure TForm_Principal.btn_ClienteClick(Sender: TObject);
 const
   // WHERE_CLAUSE pode ser ajustado conforme necessidade para filtrar registros específicos
@@ -2341,9 +2350,7 @@ end;
 procedure TForm_Principal.pImportaClienteSA1(prCodCliente: string);
 var
   Ini: TIniFile;
-  qChk, qUp: TFDQuery;
-  vExists: Boolean;
-  vCidadeId: Integer;
+  qUp: TFDQuery;
   vNascimento: TDateTime;
   s: string;
 
@@ -2448,9 +2455,6 @@ var
     Up.ParamByName('deletado').AsString  := 'N';
     Up.ParamByName('sync').AsString      := 'S';
 
-    Up.ParamByName('sync_data').DataType   := ftDateTime;
-    Up.ParamByName('sync_data').AsDateTime := Now;
-
     // campos opcionais sem mapeamento direto -> NULL
     if IsInsert then
       begin
@@ -2492,7 +2496,7 @@ begin
   qTOTVS.SQL.Add('SELECT TOP 1');
   qTOTVS.SQL.Add('  A1_COD, A1_NOME, A1_NREDUZ, A1_END, A1_BAIRRO, A1_CEP, A1_MUN, A1_EST,');
   qTOTVS.SQL.Add('  A1_CGC, A1_INSCR, A1_DTNASC, A1_SUFRAMA, A1_VEND, A1_LC, A1_COMIS,');
-  qTOTVS.SQL.Add('  A1_PESSOA, A1_TIPO, A1_COD_MUN, A1_IBGE, A1_OBSERV');
+  qTOTVS.SQL.Add('  A1_PESSOA, A1_TIPO, A1_COD_MUN, A1_IBGE, A1_OBSERV, A1_COMPLEM, A1_EMAIL');
   qTOTVS.SQL.Add('FROM SA1010 (NOLOCK)');
   qTOTVS.SQL.Add('WHERE D_E_L_E_T_ = ''''');
 
@@ -2505,93 +2509,170 @@ begin
   if qTOTVS.IsEmpty then
     Exit; // nada a importar
 
-  // Verificar existência no Supabase por erp_codigo
-  qChk := TFDQuery.Create(nil);
-  qUp  := TFDQuery.Create(nil);
+  // UPSERT único no Supabase (ON CONFLICT por erp_codigo)
+  const
+    SQL_UPSERT =
+      'INSERT INTO public.tbcliente (' +
+      '  empresa_id, nome_pupular, nome, endereco, complemento,' +
+      '  bairro, cidade_id, uf, cep, vendedor_id, naturalidade, nascimento,' +
+      '  sexo, tipo, cpf_cnpj, rg_cgf, estcivil, obs, pai, mae,' +
+      '  limite_credito, conjuge, comissao, situacao, deletado, email, site,' +
+      '  cpf_conjuge, rg_conjuge, rg_orgao, rg_uf, rg_orgao_conjuge, rg_uf_conjuge,' +
+      '  profissao, natural_id, nacionalidade, regime_casamento, renda_conjuge,' +
+      '  nacionalidade_conjuge, profissao_conjuge, numero, suframa, pais_id,' +
+      '  data_batismo, cargo_id, funcao_id, grupo_id, subgrupo_id,' +
+      '  nascimento_conjuge, dia_vencimento, cnh, cnh_categoria,' +
+      '  cnh_emissao, cnh_vencimento, rg_emissao, data_inc, usuario_i,' +
+      '  data_alt, usuario_a, data_del, usuario_d, erp_codigo, ctps_n,' +
+      '  ctps_s, ctps_uf, nit, ctps_emissao, cnh_uf, data_admissao,' +
+      '  titulo_numero, titulo_zona, titulo_secao, banco_id, banco,' +
+      '  agencia, conta, cor, grau_instrucao, bloqueio_id, setor_id,' +
+      '  sync, sync_data, cidade' +
+      ') VALUES (' +
+      '  :empresa_id, :nome_pupular, :nome, :endereco, :complemento,' +
+      '  :bairro, :cidade_id, :uf, :cep, :vendedor_id, :naturalidade, :nascimento,' +
+      '  :sexo, :tipo, :cpf_cnpj, :rg_cgf, :estcivil, :obs, :pai, :mae,' +
+      '  :limite_credito, :conjuge, :comissao, :situacao, :deletado, :email, :site,' +
+      '  :cpf_conjuge, :rg_conjuge, :rg_orgao, :rg_uf, :rg_orgao_conjuge, :rg_uf_conjuge,' +
+      '  :profissao, :natural_id, :nacionalidade, :regime_casamento, :renda_conjuge,' +
+      '  :nacionalidade_conjuge, :profissao_conjuge, :numero, :suframa, :pais_id,' +
+      '  :data_batismo, :cargo_id, :funcao_id, :grupo_id, :subgrupo_id,' +
+      '  :nascimento_conjuge, :dia_vencimento, :cnh, :cnh_categoria,' +
+      '  :cnh_emissao, :cnh_vencimento, :rg_emissao, :data_inc, :usuario_i,' +
+      '  :data_alt, :usuario_a, :data_del, :usuario_d, :erp_codigo, :ctps_n,' +
+      '  :ctps_s, :ctps_uf, :nit, :ctps_emissao, :cnh_uf, :data_admissao,' +
+      '  :titulo_numero, :titulo_zona, :titulo_secao, :banco_id, :banco,' +
+      '  :agencia, :conta, :cor, :grau_instrucao, :bloqueio_id, :setor_id,' +
+      '  :sync, (now() at time zone ''America/Sao_Paulo''), :cidade' +
+      ') ON CONFLICT (erp_codigo) DO UPDATE SET ' +
+      '  empresa_id=EXCLUDED.empresa_id, nome_pupular=EXCLUDED.nome_pupular,' +
+      '  nome=EXCLUDED.nome, endereco=EXCLUDED.endereco, complemento=EXCLUDED.complemento,' +
+      '  bairro=EXCLUDED.bairro, cidade_id=EXCLUDED.cidade_id, uf=EXCLUDED.uf,' +
+      '  cep=EXCLUDED.cep, vendedor_id=EXCLUDED.vendedor_id, naturalidade=EXCLUDED.naturalidade,' +
+      '  nascimento=EXCLUDED.nascimento, sexo=EXCLUDED.sexo, tipo=EXCLUDED.tipo,' +
+      '  cpf_cnpj=EXCLUDED.cpf_cnpj, rg_cgf=EXCLUDED.rg_cgf, estcivil=EXCLUDED.estcivil,' +
+      '  obs=EXCLUDED.obs, pai=EXCLUDED.pai, mae=EXCLUDED.mae,' +
+      '  limite_credito=EXCLUDED.limite_credito, conjuge=EXCLUDED.conjuge,' +
+      '  comissao=EXCLUDED.comissao, situacao=EXCLUDED.situacao, deletado=EXCLUDED.deletado,' +
+      '  email=EXCLUDED.email, site=EXCLUDED.site, cpf_conjuge=EXCLUDED.cpf_conjuge,' +
+      '  rg_conjuge=EXCLUDED.rg_conjuge, rg_orgao=EXCLUDED.rg_orgao, rg_uf=EXCLUDED.rg_uf,' +
+      '  rg_orgao_conjuge=EXCLUDED.rg_orgao_conjuge, rg_uf_conjuge=EXCLUDED.rg_uf_conjuge,' +
+      '  profissao=EXCLUDED.profissao, natural_id=EXCLUDED.natural_id,' +
+      '  nacionalidade=EXCLUDED.nacionalidade, regime_casamento=EXCLUDED.regime_casamento,' +
+      '  renda_conjuge=EXCLUDED.renda_conjuge, nacionalidade_conjuge=EXCLUDED.nacionalidade_conjuge,' +
+      '  profissao_conjuge=EXCLUDED.profissao_conjuge, numero=EXCLUDED.numero,' +
+      '  suframa=EXCLUDED.suframa, pais_id=EXCLUDED.pais_id,' +
+      '  data_batismo=EXCLUDED.data_batismo, cargo_id=EXCLUDED.cargo_id,' +
+      '  funcao_id=EXCLUDED.funcao_id, grupo_id=EXCLUDED.grupo_id, subgrupo_id=EXCLUDED.subgrupo_id,' +
+      '  nascimento_conjuge=EXCLUDED.nascimento_conjuge, dia_vencimento=EXCLUDED.dia_vencimento,' +
+      '  cnh=EXCLUDED.cnh, cnh_categoria=EXCLUDED.cnh_categoria,' +
+      '  cnh_emissao=EXCLUDED.cnh_emissao, cnh_vencimento=EXCLUDED.cnh_vencimento,' +
+      '  rg_emissao=EXCLUDED.rg_emissao, data_inc=EXCLUDED.data_inc, usuario_i=EXCLUDED.usuario_i,' +
+      '  data_alt=EXCLUDED.data_alt, usuario_a=EXCLUDED.usuario_a, data_del=EXCLUDED.data_del,' +
+      '  usuario_d=EXCLUDED.usuario_d, erp_codigo=EXCLUDED.erp_codigo, ctps_n=EXCLUDED.ctps_n,' +
+      '  ctps_s=EXCLUDED.ctps_s, ctps_uf=EXCLUDED.ctps_uf, nit=EXCLUDED.nit,' +
+      '  ctps_emissao=EXCLUDED.ctps_emissao, cnh_uf=EXCLUDED.cnh_uf,' +
+      '  data_admissao=EXCLUDED.data_admissao, titulo_numero=EXCLUDED.titulo_numero,' +
+      '  titulo_zona=EXCLUDED.titulo_zona, titulo_secao=EXCLUDED.titulo_secao,' +
+      '  banco_id=EXCLUDED.banco_id, banco=EXCLUDED.banco, agencia=EXCLUDED.agencia,' +
+      '  conta=EXCLUDED.conta, cor=EXCLUDED.cor, grau_instrucao=EXCLUDED.grau_instrucao,' +
+      '  bloqueio_id=EXCLUDED.bloqueio_id, setor_id=EXCLUDED.setor_id,' +
+      '  sync=EXCLUDED.sync, sync_data=(now() at time zone ''America/Sao_Paulo''),' +
+      '  cidade=EXCLUDED.cidade';
+
+  qUp := TFDQuery.Create(nil);
   try
-    qChk.Connection := FDConnectionSupabase;
-    qChk.SQL.Text := 'SELECT cliente_id FROM public.tbcliente WHERE erp_codigo = :erp_codigo LIMIT 1';
-    qChk.ParamByName('erp_codigo').AsString := SA1Str('A1_COD');
-    qChk.Open;
-    vExists := not qChk.IsEmpty;
-
     qUp.Connection := FDConnectionSupabase;
+    qUp.SQL.Text   := SQL_UPSERT;
 
-    if vExists then
-    begin
-      // UPDATE por erp_codigo
-      qUp.SQL.Clear;
-      qUp.SQL.Add('UPDATE public.tbcliente SET');
-      qUp.SQL.Add('  nome = :nome,');
-      qUp.SQL.Add('  nome_pupular = :nome_pupular,');
-      qUp.SQL.Add('  endereco = :endereco,');
-      qUp.SQL.Add('  bairro = :bairro,');
-      qUp.SQL.Add('  cidade = :cidade,');
-      qUp.SQL.Add('  cidade_id = :cidade_id,');
-      qUp.SQL.Add('  uf = :uf,');
-      qUp.SQL.Add('  cep = :cep,');
-      qUp.SQL.Add('  vendedor_id = :vendedor_id,');
-      qUp.SQL.Add('  nascimento = :nascimento,');
-      qUp.SQL.Add('  tipo = :tipo,');
-      qUp.SQL.Add('  cpf_cnpj = :cpf_cnpj,');
-      qUp.SQL.Add('  rg_cgf = :rg_cgf,');
-      qUp.SQL.Add('  obs = :obs,');
-      qUp.SQL.Add('  limite_credito = :limite_credito,');
-      qUp.SQL.Add('  comissao = :comissao,');
-      qUp.SQL.Add('  situacao = :situacao,');
-      qUp.SQL.Add('  suframa = :suframa,');
-      qUp.SQL.Add('  sync = :sync,');
-      qUp.SQL.Add('  data_alt = (now() at time zone ''America/Sao_Paulo''),');
-      qUp.SQL.Add('  sync_data = (now() at time zone ''America/Sao_Paulo'')');
-      qUp.SQL.Add('WHERE erp_codigo = :erp_codigo');
+    FDConnectionSupabase.StartTransaction;
+    try
+      // Preenche parâmetros mapeados da SA1 e define demais como NULL
+      MapCommonParams(qUp, True);
 
-      FDConnectionSupabase.StartTransaction;
-      try
-        MapCommonParams(qUp, False);
-        qUp.ParamByName('erp_codigo').AsString := SA1Str('A1_COD');
-        qUp.ExecSQL;
-        FDConnectionSupabase.Commit;
-      except
-        on E: Exception do
-        begin
-          FDConnectionSupabase.Rollback;
-          raise;
-        end;
-      end;
-    end
-    else
-    begin
-      // INSERT (sem cliente_id, deixando o default/sequence do banco)
-      qUp.SQL.Clear;
-      qUp.SQL.Add('INSERT INTO public.tbcliente (');
-      qUp.SQL.Add('  nome_pupular, nome, endereco, complemento, bairro, cidade_id, uf, cep,');
-      qUp.SQL.Add('  vendedor_id, naturalidade, nascimento, sexo, tipo, cpf_cnpj, rg_cgf,');
-      qUp.SQL.Add('  estcivil, obs, pai, mae, limite_credito, conjuge, comissao, situacao,');
-      qUp.SQL.Add('  deletado, email, site, numero, suframa, pais_id, data_inc, usuario_i,');
-      qUp.SQL.Add('  erp_codigo, sync, sync_data, cidade');
-      qUp.SQL.Add(') VALUES (');
-      qUp.SQL.Add('  :nome_pupular, :nome, :endereco, :complemento, :bairro, :cidade_id, :uf, :cep,');
-      qUp.SQL.Add('  :vendedor_id, :naturalidade, :nascimento, :sexo, :tipo, :cpf_cnpj, :rg_cgf,');
-      qUp.SQL.Add('  :estcivil, :obs, :pai, :mae, :limite_credito, :conjuge, :comissao, :situacao,');
-      qUp.SQL.Add('  :deletado, :email, :site, :numero, :suframa, :pais_id, :data_inc, :usuario_i,');
-      qUp.SQL.Add('  :erp_codigo, :sync, (now() at time zone ''America/Sao_Paulo''), :cidade');
-      qUp.SQL.Add(')');
+      // Chave de conflito
+      qUp.ParamByName('erp_codigo').AsString := SA1Str('A1_COD');
 
-      FDConnectionSupabase.StartTransaction;
-      try
-        MapCommonParams(qUp, True);
-        qUp.ExecSQL;
-        FDConnectionSupabase.Commit;
-      except
-        on E: Exception do
-        begin
-          FDConnectionSupabase.Rollback;
-          raise;
-        end;
+      // Campos adicionais não mapeados na SA1 -> NULL/Defaults
+      // Inteiros
+      qUp.ParamByName('empresa_id').DataType := ftInteger;      qUp.ParamByName('empresa_id').Clear;
+      qUp.ParamByName('vendedor_id').DataType := ftInteger;     qUp.ParamByName('vendedor_id').Clear;
+      qUp.ParamByName('natural_id').DataType := ftInteger;      qUp.ParamByName('natural_id').Clear;
+      qUp.ParamByName('pais_id').DataType := ftInteger;         qUp.ParamByName('pais_id').Clear;
+      qUp.ParamByName('cargo_id').DataType := ftInteger;        qUp.ParamByName('cargo_id').Clear;
+      qUp.ParamByName('funcao_id').DataType := ftInteger;       qUp.ParamByName('funcao_id').Clear;
+      qUp.ParamByName('grupo_id').DataType := ftInteger;        qUp.ParamByName('grupo_id').Clear;
+      qUp.ParamByName('subgrupo_id').DataType := ftInteger;     qUp.ParamByName('subgrupo_id').Clear;
+      qUp.ParamByName('dia_vencimento').DataType := ftInteger;  qUp.ParamByName('dia_vencimento').Clear;
+      qUp.ParamByName('usuario_a').DataType := ftInteger;       qUp.ParamByName('usuario_a').Clear;
+      qUp.ParamByName('usuario_d').DataType := ftInteger;       qUp.ParamByName('usuario_d').Clear;
+      qUp.ParamByName('banco_id').DataType := ftInteger;        qUp.ParamByName('banco_id').Clear;
+      qUp.ParamByName('bloqueio_id').DataType := ftInteger;     qUp.ParamByName('bloqueio_id').Clear;
+      qUp.ParamByName('setor_id').DataType := ftInteger;        qUp.ParamByName('setor_id').Clear;
+
+      // Float
+      qUp.ParamByName('renda_conjuge').DataType := ftFloat;     qUp.ParamByName('renda_conjuge').Clear;
+
+      // String
+      qUp.ParamByName('naturalidade').DataType := ftString;     qUp.ParamByName('naturalidade').Clear;
+      qUp.ParamByName('sexo').DataType := ftString;             qUp.ParamByName('sexo').Clear;
+      qUp.ParamByName('estcivil').DataType := ftString;         qUp.ParamByName('estcivil').Clear;
+      qUp.ParamByName('pai').DataType := ftString;              qUp.ParamByName('pai').Clear;
+      qUp.ParamByName('mae').DataType := ftString;              qUp.ParamByName('mae').Clear;
+      qUp.ParamByName('conjuge').DataType := ftString;          qUp.ParamByName('conjuge').Clear;
+      qUp.ParamByName('site').DataType := ftString;             qUp.ParamByName('site').Clear;
+      qUp.ParamByName('cpf_conjuge').DataType := ftString;      qUp.ParamByName('cpf_conjuge').Clear;
+      qUp.ParamByName('rg_conjuge').DataType := ftString;       qUp.ParamByName('rg_conjuge').Clear;
+      qUp.ParamByName('rg_orgao').DataType := ftString;         qUp.ParamByName('rg_orgao').Clear;
+      qUp.ParamByName('rg_uf').DataType := ftString;            qUp.ParamByName('rg_uf').Clear;
+      qUp.ParamByName('rg_orgao_conjuge').DataType := ftString; qUp.ParamByName('rg_orgao_conjuge').Clear;
+      qUp.ParamByName('rg_uf_conjuge').DataType := ftString;    qUp.ParamByName('rg_uf_conjuge').Clear;
+      qUp.ParamByName('profissao').DataType := ftString;        qUp.ParamByName('profissao').Clear;
+      qUp.ParamByName('nacionalidade').DataType := ftString;    qUp.ParamByName('nacionalidade').Clear;
+      qUp.ParamByName('regime_casamento').DataType := ftString; qUp.ParamByName('regime_casamento').Clear;
+      qUp.ParamByName('nacionalidade_conjuge').DataType := ftString; qUp.ParamByName('nacionalidade_conjuge').Clear;
+      qUp.ParamByName('profissao_conjuge').DataType := ftString; qUp.ParamByName('profissao_conjuge').Clear;
+      qUp.ParamByName('cnh').DataType := ftString;              qUp.ParamByName('cnh').Clear;
+      qUp.ParamByName('cnh_categoria').DataType := ftString;    qUp.ParamByName('cnh_categoria').Clear;
+      qUp.ParamByName('ctps_n').DataType := ftString;           qUp.ParamByName('ctps_n').Clear;
+      qUp.ParamByName('ctps_s').DataType := ftString;           qUp.ParamByName('ctps_s').Clear;
+      qUp.ParamByName('ctps_uf').DataType := ftString;          qUp.ParamByName('ctps_uf').Clear;
+      qUp.ParamByName('nit').DataType := ftString;              qUp.ParamByName('nit').Clear;
+      qUp.ParamByName('cnh_uf').DataType := ftString;           qUp.ParamByName('cnh_uf').Clear;
+      qUp.ParamByName('titulo_numero').DataType := ftString;    qUp.ParamByName('titulo_numero').Clear;
+      qUp.ParamByName('titulo_zona').DataType := ftString;      qUp.ParamByName('titulo_zona').Clear;
+      qUp.ParamByName('titulo_secao').DataType := ftString;     qUp.ParamByName('titulo_secao').Clear;
+      qUp.ParamByName('banco').DataType := ftString;            qUp.ParamByName('banco').Clear;
+      qUp.ParamByName('agencia').DataType := ftString;          qUp.ParamByName('agencia').Clear;
+      qUp.ParamByName('conta').DataType := ftString;            qUp.ParamByName('conta').Clear;
+      qUp.ParamByName('cor').DataType := ftString;              qUp.ParamByName('cor').Clear;
+      qUp.ParamByName('grau_instrucao').DataType := ftString;   qUp.ParamByName('grau_instrucao').Clear;
+
+      // Datas (DATE) e Timestamps (DATETIME)
+      qUp.ParamByName('data_batismo').DataType := ftDate;       qUp.ParamByName('data_batismo').Clear;
+      qUp.ParamByName('nascimento_conjuge').DataType := ftDate; qUp.ParamByName('nascimento_conjuge').Clear;
+      qUp.ParamByName('cnh_emissao').DataType := ftDate;        qUp.ParamByName('cnh_emissao').Clear;
+      qUp.ParamByName('cnh_vencimento').DataType := ftDate;     qUp.ParamByName('cnh_vencimento').Clear;
+      qUp.ParamByName('rg_emissao').DataType := ftDate;         qUp.ParamByName('rg_emissao').Clear;
+      qUp.ParamByName('data_alt').DataType := ftDateTime;       qUp.ParamByName('data_alt').Clear;
+      qUp.ParamByName('data_del').DataType := ftDateTime;       qUp.ParamByName('data_del').Clear;
+      qUp.ParamByName('data_admissao').DataType := ftDate;      qUp.ParamByName('data_admissao').Clear;
+
+      // Campos já cobertos no MapCommonParams mas incluídos no SQL
+      // (nome_pupular, nome, endereco, complemento, bairro, cidade_id, uf, cep,
+      //  nascimento, tipo, cpf_cnpj, rg_cgf, obs, limite_credito, comissao,
+      //  situacao, deletado, email, numero, suframa, sync, cidade)
+
+      qUp.ExecSQL;
+      FDConnectionSupabase.Commit;
+    except
+      on E: Exception do
+      begin
+        FDConnectionSupabase.Rollback;
+        raise;
       end;
     end;
   finally
-    qChk.Free;
     qUp.Free;
   end;
 end;
