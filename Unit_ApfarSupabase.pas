@@ -52,6 +52,7 @@ type
     procedure btn_ImportarProdutoClick(Sender: TObject);
     procedure btn_ProdutoClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
     { Private declarations }
     FBusy: Boolean;
@@ -1533,7 +1534,9 @@ begin
         qUp.ParamByName('cliente').AsString            := qTOTVS.FieldByName('cliente').AsString;
         qUp.ParamByName('cidade').AsString             := qTOTVS.FieldByName('cidade').AsString;
         qUp.ParamByName('uf').AsString                 := qTOTVS.FieldByName('uf').AsString;
+
         qUp.ParamByName('erp_cliente').AsString        := qTOTVS.FieldByName('erp_cliente').AsString;
+
         qUp.ParamByName('obs').AsString                := qTOTVS.FieldByName('obs').AsString;
         qUp.ParamByName('endereco').AsString           := qTOTVS.FieldByName('endereco').AsString;
         qUp.ParamByName('cep').AsString                := qTOTVS.FieldByName('cep').AsString;
@@ -2353,6 +2356,18 @@ begin
   except
     on E: Exception do ShowMessage('Erro: ' + E.Message);
   end;
+end;
+
+procedure TForm_Principal.FormDestroy(Sender: TObject);
+begin
+  try
+    if FDConnectionSupabase.InTransaction then
+      FDConnectionSupabase.Rollback;
+  except end;
+  try
+    if FDConnectionSupabase.Connected then
+      FDConnectionSupabase.Connected := False;
+  except end;
 end;
 
 procedure TForm_Principal.pImportaClienteSA1(prCodCliente: string);

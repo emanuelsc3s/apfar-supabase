@@ -14,6 +14,7 @@ object Form_Principal: TForm_Principal
   Position = poScreenCenter
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object DBGrid1: TDBGrid
