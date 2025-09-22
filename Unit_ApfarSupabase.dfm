@@ -2,7 +2,7 @@ object Form_Principal: TForm_Principal
   Left = 0
   Top = 0
   Caption = 'Form_Principal'
-  ClientHeight = 404
+  ClientHeight = 483
   ClientWidth = 872
   Color = clBtnFace
   Font.Charset = ANSI_CHARSET
@@ -226,6 +226,25 @@ object Form_Principal: TForm_Principal
     Caption = 'Button1'
     TabOrder = 11
     OnClick = Button1Click
+  end
+  object Panel1: TPanel
+    Left = 155
+    Top = 399
+    Width = 120
+    Height = 35
+    Cursor = crHandPoint
+    BevelOuter = bvNone
+    Caption = 'Imp. Pesagem'
+    Color = 12477460
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clWhite
+    Font.Height = -13
+    Font.Name = 'Segoe UI'
+    Font.Style = [fsBold]
+    ParentBackground = False
+    ParentFont = False
+    TabOrder = 12
+    OnClick = btn_ProdutoClick
   end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (

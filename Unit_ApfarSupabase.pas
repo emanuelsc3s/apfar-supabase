@@ -38,6 +38,7 @@ type
     btn_ImportarProduto: TPanel;
     btn_Produto: TPanel;
     Button1: TButton;
+    Panel1: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
@@ -2527,8 +2528,7 @@ var
     Up.ParamByName('numero').DataType    := ftInteger;
     Up.ParamByName('numero').Clear;
 
-    Up.ParamByName('usuario_i').DataType  := ftInteger;
-    Up.ParamByName('usuario_i').AsInteger := 1;
+    // usuario_i será definido apenas no INSERT
 
     Up.ParamByName('deletado').AsString  := 'N';
     Up.ParamByName('sync').AsString      := 'S';
@@ -2539,6 +2539,9 @@ var
         // auditoria/sync
         Up.ParamByName('data_inc').DataType   := ftDateTime;
         Up.ParamByName('data_inc').AsDateTime := Now;
+        // auditoria de inclusão
+        Up.ParamByName('usuario_i').DataType  := ftInteger;
+        Up.ParamByName('usuario_i').AsInteger := 1;
       end
     else
       begin
