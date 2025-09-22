@@ -40,6 +40,7 @@ type
     Button1: TButton;
     Panel1: TPanel;
     procedure FormCreate(Sender: TObject);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure btn_ImportarReceberClick(Sender: TObject);
     procedure btn_ConfigurarClick(Sender: TObject);
     procedure btn_FecharClick(Sender: TObject);
@@ -53,6 +54,8 @@ type
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
+    FBusy: Boolean;
+    FShutdownRequested: Boolean;
     procedure pImportaClienteSA1(prCodCliente: string);
   public
     { Public declarations }
@@ -70,8 +73,20 @@ uses Unit_ConfigSqlServer, Unit_Activity;
 
 procedure TForm_Principal.btn_FecharClick(Sender: TObject);
 begin
-  Application.Terminate;
+  Close;
 end;
+
+procedure TForm_Principal.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+  if FBusy then
+  begin
+    CanClose := False;
+    FShutdownRequested := True;
+    Exit;
+  end;
+  CanClose := True;
+end;
+
 
 procedure TForm_Principal.btn_ImportarLicitacaoClick(Sender: TObject);
 const
@@ -1408,18 +1423,6 @@ begin
     SQL.Add(' SE1.E1_NUM titulo, SE1.E1_PREFIXO prefixo, SE1.E1_TIPO tipo, SE1.E1_SALDO saldo,');
     SQL.Add(' SE1.E1_VALOR valor, SE1.E1_VALOR - SE1.E1_SALDO valor_pago,');
     SQL.Add(' CASE WHEN SE1.E1_VENCREA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_VENCREA AS DATETIME),103)  END AS vencimento,');
-    SQL.Add(' SE1.E1_VENCREA emissao,');
-    SQL.Add(' CASE WHEN SE1.E1_BAIXA <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA AS DATETIME),103)  END AS data_baixa,');
-    SQL.Add(' SA1.A1_NOME cliente,');
-    SQL.Add(' SA1.A1_MUNICIPIO cidade,');
-    SQL.Add(' SA1.A1_ESTADO uf,');
-    SQL.Add(' SA1.A1_COD erp_cliente,');
-    SQL.Add(' SE1.E1_OBS obs,');
-    SQL.Add(' SA1.A1_END endereco,');
-    SQL.Add(' SA1.A1_CEP cep,');
-    SQL.Add(' SA1.A1_CGC_CPF cnpj,');
-    SQL.Add(' SA1.A1_TELEFONE telefone,');
-//    SQL.Add(' CASE WHEN SE1
     SQL.Add(' CASE WHEN SE1.E1_EMISSAO <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_EMISSAO AS DATETIME),103) END AS emissao,');
     SQL.Add(' CASE WHEN SE1.E1_BAIXA   <> '''' THEN CONVERT(VARCHAR,CAST(SE1.E1_BAIXA AS DATETIME),103)   END AS data_baixa,');
     SQL.Add(' RTRIM(SA1.A1_NOME) cliente,');
@@ -2309,6 +2312,10 @@ end;
 
 procedure TForm_Principal.FormCreate(Sender: TObject);
 begin
+  // Inicializa flags de estado da aplicação
+  FBusy := False;
+  FShutdownRequested := False;
+
  // Referencia de conexão: https://supabase.com/docs/guides/database/pgadmin
 //  libpq.dll compatível com a sua “bitness”
 //  {$IFDEF WIN64}
