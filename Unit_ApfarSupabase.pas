@@ -1504,6 +1504,8 @@ begin
       CurrentRecord := 0;
       while not qTOTVS.Eof do
       begin
+        pImportaClienteSA1(qTOTVS.FieldByName('erp_cliente').AsString);
+
         Inc(CurrentRecord);
 
         if Assigned(Form_Activity) then
