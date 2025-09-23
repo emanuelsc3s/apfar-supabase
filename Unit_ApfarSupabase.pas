@@ -2441,33 +2441,31 @@ var
   end;
 
   function SA1Date(const AField: string; out ADate: TDateTime): Boolean;
-  var
-    txt: string; y, m, d: Word;
+  var txt: string; y, m, d: Word;
   begin
-    Result := False;
-    ADate := 0;
+    Result := False; ADate := 0;
     if qSelectTOTVS.FieldByName(AField).IsNull then Exit;
+
     // Datas do Protheus geralmente vêm como 'yyyymmdd' (char)
     txt := Trim(qSelectTOTVS.FieldByName(AField).AsString);
+    if txt = '' then Exit;  // evita tentar converter '        '
+
     if Length(txt) = 8 then
-    begin
-      try
-        y := StrToInt(Copy(txt, 1, 4));
-        m := StrToInt(Copy(txt, 5, 2));
-        d := StrToInt(Copy(txt, 7, 2));
-        ADate := EncodeDate(y, m, d);
-        Result := True;
-        Exit;
-      except
-        Result := False;
-      end;
+    try
+      y := StrToInt(Copy(txt, 1, 4));
+      m := StrToInt(Copy(txt, 5, 2));
+      d := StrToInt(Copy(txt, 7, 2));
+      ADate := EncodeDate(y, m, d);
+      Exit(True);
+    except
     end;
-    // Caso o driver já entregue como date/datetime
+
+    // Caso o driver já entregue como date/datetime, tenta somente se o tipo do campo for realmente de data
+    if qSelectTOTVS.FieldByName(AField).DataType in [ftDate, ftDateTime, ftTimeStamp] then
     try
       ADate := qSelectTOTVS.FieldByName(AField).AsDateTime;
-      Result := (ADate > 0);
+      Exit(ADate > 0);
     except
-      Result := False;
     end;
   end;
 
@@ -2588,7 +2586,7 @@ begin
   qSelectTOTVS.Close;
   qSelectTOTVS.Connection := FDConnectionTOTVS;
   qSelectTOTVS.SQL.Clear;
-  qSelectTOTVS.SQL.Add('SELECT TOP 1');
+  qSelectTOTVS.SQL.Add('SELECT');
   qSelectTOTVS.SQL.Add('  A1_COD, A1_NOME, A1_NREDUZ, A1_END, A1_BAIRRO, A1_CEP, A1_MUN, A1_EST,');
   qSelectTOTVS.SQL.Add('  A1_CGC, A1_INSCR, A1_DTNASC, A1_SUFRAMA, A1_VEND, A1_LC, A1_COMIS,');
   qSelectTOTVS.SQL.Add('  A1_PESSOA, A1_TIPO, A1_COD_MUN, A1_IBGE, A1_OBSERV, A1_COMPLEM, A1_EMAIL');

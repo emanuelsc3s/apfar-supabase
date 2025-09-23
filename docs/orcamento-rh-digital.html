@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orçamento - Projeto RH Digital</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .invoice-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, rgb(20, 100, 190) 0%, rgb(30, 120, 210) 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        .header .header-logo {
+            height: 56px;
+            width: auto;
+            display: block;
+            flex-shrink: 0;
+        }
+
+        .invoice-info {
+            padding: 30px 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .info-section h3 {
+            color: rgb(20, 100, 190);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            border-bottom: 2px solid rgb(20, 100, 190);
+            padding-bottom: 5px;
+        }
+
+        .info-section p {
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        .table-container {
+            padding: 40px;
+        }
+
+        .table-title {
+            color: rgb(20, 100, 190);
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .cost-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .cost-table thead {
+            background: linear-gradient(135deg, rgb(20, 100, 190) 0%, rgb(30, 120, 210) 100%);
+            color: white;
+        }
+
+        .cost-table th {
+            padding: 18px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
+
+        .cost-table tbody tr {
+            border-bottom: 1px solid #e9ecef;
+            transition: background-color 0.3s ease;
+        }
+
+        .cost-table tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+
+        .cost-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .cost-table td {
+            padding: 20px 15px;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .cost-table .description {
+            font-weight: 500;
+            color: #333;
+            max-width: 300px;
+        }
+
+        .cost-table .recurrence {
+            font-weight: 500;
+            color: rgb(20, 100, 190);
+        }
+
+        .cost-table .amount {
+            font-weight: 600;
+            color: #2d5a27;
+            text-align: right;
+        }
+
+        .cost-table .amount.usd {
+            color: #b8860b;
+        }
+
+        .summary {
+            background: #f8f9ff;
+            padding: 30px;
+            border-top: 3px solid rgb(20, 100, 190);
+        }
+
+        .summary h3 {
+            color: rgb(20, 100, 190);
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid rgb(20, 100, 190);
+        }
+
+        .summary-card h4 {
+            color: rgb(20, 100, 190);
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .summary-card .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #2d5a27;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .footer p {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .conversion-note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #856404;
+        }
+
+        @media (max-width: 768px) {
+            .invoice-container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .header .header-logo {
+                height: 44px;
+            }
+
+            .invoice-info {
+                grid-template-columns: 1fr;
+                padding: 20px;
+                gap: 20px;
+            }
+
+            .table-container {
+                padding: 20px;
+                overflow-x: auto;
+            }
+
+            .cost-table {
+                min-width: 600px;
+            }
+
+            .summary {
+                padding: 20px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="header">
+            <img src="logomarca-removebg-preview.png" alt="Logomarca" class="header-logo">
+            <div class="header-text">
+                <h1>ORÇAMENTO</h1>
+                <p>Projeto RH Digital - Processo de Implantação</p>
+            </div>
+        </div>
+
+        <!-- Invoice Info -->
+        <div class="invoice-info">
+            <div class="info-section">
+                <h3>Projeto</h3>
+                <p><strong>RH Digital</strong></p>
+                <p>Sistema de Recursos Humanos</p>
+                <p>Plataforma Digital Completa</p>
+            </div>
+            <div class="info-section">
+                <h3>Informações</h3>
+                <p><strong>Data:</strong> 23 de Setembro, 2025</p>
+                <p><strong>Válido por:</strong> 30 dias</p>
+                <p><strong>Moeda:</strong> Real Brasileiro (R$)</p>
+            </div>
+        </div>
+
+        <!-- Cost Table -->
+        <div class="table-container">
+            <h2 class="table-title">Tabela de Custos do Projeto</h2>
+            
+            <div class="conversion-note">
+                <strong>📌 Nota:</strong> Valores em dólar convertidos pela cotação atual: US$ 1,00 = R$ 5,34 (23/09/2025)
+            </div>
+
+            <table class="cost-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%">Descrição</th>
+                        <th style="width: 20%">Recorrência</th>
+                        <th style="width: 20%">Valor Original</th>
+                        <th style="width: 20%">Valor em R$</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="description">
+                            <strong>Domínio farmace.io</strong><br>
+                            <span style="color: #666; font-size: 0.85rem;">Acesso externo à aplicação via internet</span>
+                        </td>
+                        <td class="recurrence">Anual</td>
+                        <td class="amount">R$ 185,99</td>
+                        <td class="amount">R$ 185,99</td>
+                    </tr>
+                    <tr>
+                        <td class="description">
+                            <strong>Domínio farmace.ai</strong><br>
+                            <span style="color: #666; font-size: 0.85rem;">Inteligência Artificial LIS IA para acesso público</span>
+                        </td>
+                        <td class="recurrence">Anual</td>
+                        <td class="amount">R$ 465,98</td>
+                        <td class="amount">R$ 465,98</td>
+                    </tr>
+                    <tr>
+                        <td class="description">
+                            <strong>Banco de Dados na Nuvem</strong><br>
+                            <span style="color: #666; font-size: 0.85rem;">Armazenamento de documentos do RH digital</span>
+                        </td>
+                        <td class="recurrence">Mensal<br><span style="font-size: 0.8rem; opacity: 0.7;">(conforme uso)</span></td>
+                        <td class="amount usd">US$ 30,00</td>
+                        <td class="amount">R$ 160,20</td>
+                    </tr>
+                    <tr>
+                        <td class="description">
+                            <strong>Servidor na Nuvem</strong><br>
+                            <span style="color: #666; font-size: 0.85rem;">Hospedagem da aplicação RH digital</span>
+                        </td>
+                        <td class="recurrence">Mensal<br><span style="font-size: 0.8rem; opacity: 0.7;">(fixo)</span></td>
+                        <td class="amount usd">US$ 30,00</td>
+                        <td class="amount">R$ 160,20</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary">
+            <h3>Resumo de Investimentos</h3>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h4>Custos Anuais</h4>
+                    <div class="value">R$ 651,97</div>
+                    <small style="color: #666;">Domínios</small>
+                </div>
+                <div class="summary-card">
+                    <h4>Custos Mensais</h4>
+                    <div class="value">R$ 320,40</div>
+                    <small style="color: #666;">Servidor + Banco</small>
+                </div>
+                <div class="summary-card">
+                    <h4>Total Ano 1</h4>
+                    <div class="value" style="color: rgb(20, 100, 190);">R$ 4.496,77</div>
+                    <small style="color: #666;">(Anual + 12x Mensal)</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Projeto RH Digital</strong></p>
+            <p>Orçamento válido por 30 dias a partir da data de emissão</p>
+            <p>Valores sujeitos à variação cambial para itens cotados em dólar</p>
+        </div>
+    </div>
+
+    <script>
+        // Adicionar efeito de hover nas linhas da tabela
+        document.addEventListener('DOMContentLoaded', function() {
+            const rows = document.querySelectorAll('.cost-table tbody tr');
+            rows.forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateX(5px)';
+                    this.style.transition = 'all 0.3s ease';
+                });
+                row.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateX(0)';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
