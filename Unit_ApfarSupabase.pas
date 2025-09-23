@@ -2429,7 +2429,6 @@ const
     '  :sync, (now() at time zone ''America/Sao_Paulo''), :cidade' +
     ')';
 var
-  Ini: TIniFile;
   qUp, qSelectTOTVS: TFDQuery;
   fs: TFormatSettings;
   vNascimento: TDateTime;
@@ -2583,16 +2582,6 @@ begin
 
   // Garantir Supabase conectado
   FDConnectionSupabase.Connected := True;
-
-  // Conectar TOTVS (SQL Server)
-  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
-  try
-    if not Assigned(Form_ConfigSqlServer) then
-      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
-    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionTOTVS, 'Protheus');
-  finally
-    Ini.Free;
-  end;
 
   // Buscar no SA1
   qSelectTOTVS := TFDQuery.Create(nil);
