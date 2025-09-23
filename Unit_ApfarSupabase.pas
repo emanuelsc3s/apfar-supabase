@@ -2430,15 +2430,15 @@ const
     ')';
 var
   Ini: TIniFile;
-  qUp: TFDQuery;
+  qUp, qSelectTOTVS: TFDQuery;
   fs: TFormatSettings;
   vNascimento: TDateTime;
   s: string;
 
   function SA1Str(const AField: string): string;
   begin
-    if qTOTVS.FieldByName(AField).IsNull then Result := ''
-    else Result := Trim(qTOTVS.FieldByName(AField).AsString);
+    if qSelectTOTVS.FieldByName(AField).IsNull then Result := ''
+    else Result := Trim(qSelectTOTVS.FieldByName(AField).AsString);
   end;
 
   function SA1Date(const AField: string; out ADate: TDateTime): Boolean;
@@ -2447,9 +2447,9 @@ var
   begin
     Result := False;
     ADate := 0;
-    if qTOTVS.FieldByName(AField).IsNull then Exit;
+    if qSelectTOTVS.FieldByName(AField).IsNull then Exit;
     // Datas do Protheus geralmente vêm como 'yyyymmdd' (char)
-    txt := Trim(qTOTVS.FieldByName(AField).AsString);
+    txt := Trim(qSelectTOTVS.FieldByName(AField).AsString);
     if Length(txt) = 8 then
     begin
       try
@@ -2465,7 +2465,7 @@ var
     end;
     // Caso o driver já entregue como date/datetime
     try
-      ADate := qTOTVS.FieldByName(AField).AsDateTime;
+      ADate := qSelectTOTVS.FieldByName(AField).AsDateTime;
       Result := (ADate > 0);
     except
       Result := False;
@@ -2530,8 +2530,8 @@ var
     else Up.ParamByName('tipo').AsString := s;
 
     // numérico
-    Up.ParamByName('limite_credito').AsFloat := qTOTVS.FieldByName('A1_LC').AsFloat;
-    Up.ParamByName('comissao').AsFloat       := qTOTVS.FieldByName('A1_COMIS').AsFloat;
+    Up.ParamByName('limite_credito').AsFloat := qSelectTOTVS.FieldByName('A1_LC').AsFloat;
+    Up.ParamByName('comissao').AsFloat       := qSelectTOTVS.FieldByName('A1_COMIS').AsFloat;
 
     Up.ParamByName('cidade_id').DataType := ftInteger;
     Up.ParamByName('cidade_id').Clear;
@@ -2595,23 +2595,24 @@ begin
   end;
 
   // Buscar no SA1
-  qTOTVS.Close;
-  qTOTVS.Connection := FDConnectionTOTVS;
-  qTOTVS.SQL.Clear;
-  qTOTVS.SQL.Add('SELECT TOP 1');
-  qTOTVS.SQL.Add('  A1_COD, A1_NOME, A1_NREDUZ, A1_END, A1_BAIRRO, A1_CEP, A1_MUN, A1_EST,');
-  qTOTVS.SQL.Add('  A1_CGC, A1_INSCR, A1_DTNASC, A1_SUFRAMA, A1_VEND, A1_LC, A1_COMIS,');
-  qTOTVS.SQL.Add('  A1_PESSOA, A1_TIPO, A1_COD_MUN, A1_IBGE, A1_OBSERV, A1_COMPLEM, A1_EMAIL');
-  qTOTVS.SQL.Add('FROM SA1010 (NOLOCK)');
-  qTOTVS.SQL.Add('WHERE D_E_L_E_T_ = ''''');
+  qSelectTOTVS := TFDQuery.Create(nil);
+  qSelectTOTVS.Close;
+  qSelectTOTVS.Connection := FDConnectionTOTVS;
+  qSelectTOTVS.SQL.Clear;
+  qSelectTOTVS.SQL.Add('SELECT TOP 1');
+  qSelectTOTVS.SQL.Add('  A1_COD, A1_NOME, A1_NREDUZ, A1_END, A1_BAIRRO, A1_CEP, A1_MUN, A1_EST,');
+  qSelectTOTVS.SQL.Add('  A1_CGC, A1_INSCR, A1_DTNASC, A1_SUFRAMA, A1_VEND, A1_LC, A1_COMIS,');
+  qSelectTOTVS.SQL.Add('  A1_PESSOA, A1_TIPO, A1_COD_MUN, A1_IBGE, A1_OBSERV, A1_COMPLEM, A1_EMAIL');
+  qSelectTOTVS.SQL.Add('FROM SA1010 (NOLOCK)');
+  qSelectTOTVS.SQL.Add('WHERE D_E_L_E_T_ = ''''');
 
-  qTOTVS.SQL.Add('  AND A1_COD = :pCod');
+  qSelectTOTVS.SQL.Add('  AND A1_COD = :pCod');
 
-  qTOTVS.ParamByName('pCod').AsString := prCodCliente;
+  qSelectTOTVS.ParamByName('pCod').AsString := prCodCliente;
 
-  qTOTVS.Open;
+  qSelectTOTVS.Open;
 
-  if qTOTVS.IsEmpty then
+  if qSelectTOTVS.IsEmpty then
     Exit; // nada a importar
 
   qUp := TFDQuery.Create(nil);
@@ -2801,6 +2802,7 @@ begin
     end;
   finally
     qUp.Free;
+    qSelectTOTVS.Free;
   end;
 end;
 
