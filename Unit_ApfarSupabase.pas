@@ -2376,26 +2376,8 @@ begin
 end;
 
 procedure TForm_Principal.btn_IntegrarPesagemClick(Sender: TObject);
-  function QStr(const S: string): string;
-  begin
-    Result := '''' + StringReplace(S, '''', '''''', [rfReplaceAll]) + '''';
-  end;
-  function NullableStr(const S: string): string;
-  begin
-    if Trim(S) = '' then Result := 'NULL' else Result := QStr(S);
-  end;
 var
   Ini: TIniFile;
-  DataStr: string;
-  Ano, Mes, Dia: Word;  
-  TotalProc, TotalIncl: Integer;
-  fmtNum: TFormatSettings;
-  sl: TStringList;
-  linha, outDir, outFile: string;
-  first: Boolean;
-  ZFIL, ZSTA, ZTIPO, ZROT, ZPROC, ZPROD, ZDATA, ZLOC, ZLOTE, ZEND, ZOP, ZCC: string;
-  ZYSIC: Int64;
-  ZQTD: Double;
 begin
   // Conectar TOTVS (SQL Server) e SICFAR (Firebird)
   Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
@@ -2444,144 +2426,45 @@ begin
 
   qSICFAR.SQL.Add('ORDER BY p.op');
 
-//  qSICFAR.ParamByName('pData').DataType := ftDate;
-//  qSICFAR.ParamByName('pData').AsDate := DataFiltro;
-
   qSICFAR.Open;
 
-  // Formatação numérica com ponto
-  fmtNum := TFormatSettings.Create;
-  fmtNum.DecimalSeparator := '.';
-
-  sl := TStringList.Create;
-  try
-    TotalProc := 0;
-    TotalIncl := 0;
-
-    // Cabeçalho
-    sl.Add('DECLARE @RECNO_BASE BIGINT;');
-    sl.Add('SET @RECNO_BASE = ISNULL((SELECT MAX(R_E_C_N_O_) FROM ZC3010), 0);');
-    sl.Add('');
-    sl.Add(';WITH src AS (');
-    sl.Add('    SELECT * FROM (VALUES');
-
-    first := True;
-
-    qSICFAR.First;
-    while not qSICFAR.Eof do
+  if not qSICFAR.IsEmpty then
     begin
-      Inc(TotalProc);
+      qSICFAR.First;
+      while qSICFAR.Eof do
+        begin
+          // Validação na base TOTVS, caso não exista registro incluir no SQL de Insert
+          with qTOTVS do
+            begin
+              Close;
+              Connection := FDConnectionTOTVS;
+              SQL.Text   := 'SELECT TOP 1 D3_OP ';
+              SQL.Add(' FROM SD3010 SD3 ');
+              SQL.Add(' WHERE SD3.D_E_L_E_T_ = '''' ');
 
-      ZFIL  := qSICFAR.FieldByName('ZC3_FILIAL').AsString;
-      ZSTA  := qSICFAR.FieldByName('ZC3_STATUS').AsString;
-      ZTIPO := qSICFAR.FieldByName('ZC3_TIPO').AsString;
-      ZROT  := qSICFAR.FieldByName('ZC3_ROTINA').AsString;
-      ZPROC := qSICFAR.FieldByName('ZC3_PROCES').AsString;
-      ZYSIC := qSICFAR.FieldByName('ZC3_YSIC').AsLargeInt;
-      ZPROD := qSICFAR.FieldByName('ZC3_PROD').AsString;
-      ZDATA := qSICFAR.FieldByName('ZC3_DATA').AsString;
-      ZLOC  := qSICFAR.FieldByName('ZC3_LOCAL').AsString;
-      ZLOTE := qSICFAR.FieldByName('ZC3_LOTE').AsString;
-      ZEND  := qSICFAR.FieldByName('ZC3_END').AsString;
-      ZQTD  := qSICFAR.FieldByName('ZC3_QTD').AsFloat;
-      ZOP   := qSICFAR.FieldByName('ZC3_OP').AsString;
-      ZCC   := qSICFAR.FieldByName('ZC3_CC').AsString;
+              SQL.Add(' AND D3_OP   = :pOP');
+              SQL.Add(' AND D3_COD  = :pProduto');
+              SQL.Add(' AND D3_LOTE = :pLote');
 
-      // Validação na base TOTVS
-      qTOTVS.Close;
-      qTOTVS.Connection := FDConnectionTOTVS;
-      qTOTVS.SQL.Text :=
-        'SELECT TOP 1 D3_OP ' + sLineBreak +
-        'FROM SD3010 SD3 ' + sLineBreak +
-        'WHERE SD3.D_E_L_E_T_ = '''' ' + sLineBreak +
-        '  AND D3_OP = :pOP ' + sLineBreak +
-        '  AND D3_ESTORNO = '''' ' + sLineBreak +
-        '  AND D3_TM = ''510'' ' + sLineBreak +
-        '  AND D3_DOC LIKE ''S-%''';
-      qTOTVS.ParamByName('pOP').AsString := qSICFAR.FieldByName('ZC3_OP').AsString;
-      qTOTVS.Open;
+              SQL.Add(' AND D3_ESTORNO = '''' ');
+              SQL.Add(' AND D3_TM = ''510'' ');
+              SQL.Add(' AND D3_DOC LIKE ''S-%'' ');
 
-      if qTOTVS.Eof then
-      begin
-        if not first then
-          sl[sl.Count-1] := sl[sl.Count-1] + ',';
+              ParamByName('pOP').AsString      := qSICFAR.FieldByName('ZC3_OP').AsString;
+              ParamByName('pProduto').AsString := qSICFAR.FieldByName('ZC3_PROD').AsString;
+              ParamByName('pLote').AsString    := qSICFAR.FieldByName('ZC3_LOTE').AsString;
 
-        linha :=
-          Format('        (%s,%s,%s,%s,%s,%s,%s,%s, %s,%s,%s,%s,%d,%s)',
-          [
-            QStr(ZFIL),
-            QStr(ZSTA),
-            QStr(ZTIPO),
-            QStr(Trim(ZPROD)),
-            QStr(Trim(ZDATA)),
-            QStr(ZLOC),
-            QStr(Trim(ZLOTE)),
-            NullableStr(Trim(ZEND)),
-            FloatToStrF(ZQTD, ffFixed, 18, 7, fmtNum),
-            QStr(Trim(ZOP)),
-            QStr(Trim(ZROT)),
-            QStr(Trim(ZPROC)),
-            ZYSIC,
-            QStr(Trim(ZCC))
-          ]);
-        sl.Add(linha);
-        first := False;
-        Inc(TotalIncl);
-      end;
+              Open;
+            end;
 
-      qSICFAR.Next;
+            if qTOTVS.IsEmpty then // Se vazio, então linha não existe na TOTVS, pode inserir no SQL de insert
+              begin
+
+              end;
+
+          qSICFAR.Next;
+        end;
     end;
-
-    sl.Add('    ) AS v(ZC3_FILIAL,ZC3_STATUS,ZC3_TIPO,ZC3_PROD,ZC3_DATA,ZC3_LOCAL,ZC3_LOTE,ZC3_END,ZC3_QTD,ZC3_OP,ZC3_ROTINA,ZC3_PROCES,ZC3_YSIC,ZC3_CC)');
-    sl.Add('),');
-    sl.Add('num AS (');
-    sl.Add('    SELECT ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS rn, *');
-    sl.Add('    FROM src');
-    sl.Add(')');
-    sl.Add('INSERT INTO ZC3010 (');
-    sl.Add('    R_E_C_N_O_, ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
-    sl.Add('    ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
-    sl.Add('    ZC3_QTD, ZC3_END, ZC3_OP,');
-    sl.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
-    sl.Add(')');
-    sl.Add('SELECT');
-    sl.Add('    @RECNO_BASE + rn,');
-    sl.Add('    ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
-    sl.Add('    ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
-    sl.Add('    CAST(ZC3_QTD AS DECIMAL(18,7)),');
-    sl.Add('    ISNULL(ZC3_END, ''''),');
-    sl.Add('    ZC3_OP,');
-    sl.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
-    sl.Add('FROM num;');
-
-    if TotalIncl = 0 then
-    begin
-      ShowMessage(Format('Nenhum registro para inserir. Processados: %d. Incluídos: %d.', [TotalProc, TotalIncl]));
-      Exit;
-    end;
-
-    // Define identificador do arquivo: se OP filtrada, usar OP; senão, usar data atual no formato yyyymmdd
-    if Trim(Edit_OP.Text) <> '' then
-      DataStr := Trim(Edit_OP.Text)
-    else
-    begin
-      DecodeDate(Date, Ano, Mes, Dia);
-      DataStr := Format('%.4d%.2d%.2d', [Ano, Mes, Dia]);
-    end;
-
-    // Salvar em docs\pesagem na raiz do projeto (um nível acima de Win64)
-    outDir := ExpandFileName(ExtractFilePath(Application.ExeName) + '..\docs\pesagem\');
-    ForceDirectories(outDir);
-    outFile := IncludeTrailingPathDelimiter(outDir) + Format('InsertBase_ZC3_%s.sql', [DataStr]);
-    sl.SaveToFile(outFile, TEncoding.UTF8);
-
-    ShowMessage(Format('SQL gerado com sucesso.' + sLineBreak + 'Arquivo: %s' + sLineBreak +
-      'Processados: %d   Incluídos: %d', [outFile, TotalProc, TotalIncl]));
-  finally
-    sl.Free;
-    try if qSICFAR.Active then qSICFAR.Close; except end;
-    try if qTOTVS.Active then qTOTVS.Close; except end;
-  end;
 end;
 
 procedure TForm_Principal.pImportaClienteSA1(prCodCliente: string);
