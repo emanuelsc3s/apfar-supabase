@@ -2554,15 +2554,25 @@ begin
     sl.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
     sl.Add('FROM num;');
 
-    if TotalIncl > 0 then
+    if TotalIncl = 0 then
     begin
       ShowMessage(Format('Nenhum registro para inserir. Processados: %d. Incluídos: %d.', [TotalProc, TotalIncl]));
       Exit;
     end;
 
-    outDir := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) + 'docs\pesagem\';
+    // Define identificador do arquivo: se OP filtrada, usar OP; senão, usar data atual no formato yyyymmdd
+    if Trim(Edit_OP.Text) <> '' then
+      DataStr := Trim(Edit_OP.Text)
+    else
+    begin
+      DecodeDate(Date, Ano, Mes, Dia);
+      DataStr := Format('%.4d%.2d%.2d', [Ano, Mes, Dia]);
+    end;
+
+    // Salvar em docs\pesagem na raiz do projeto (um nível acima de Win64)
+    outDir := ExpandFileName(ExtractFilePath(Application.ExeName) + '..\docs\pesagem\');
     ForceDirectories(outDir);
-    outFile := outDir + Format('InsertBase_ZC3_%s.sql', [StringReplace(DataStr, '-', '', [rfReplaceAll])]);
+    outFile := IncludeTrailingPathDelimiter(outDir) + Format('InsertBase_ZC3_%s.sql', [DataStr]);
     sl.SaveToFile(outFile, TEncoding.UTF8);
 
     ShowMessage(Format('SQL gerado com sucesso.' + sLineBreak + 'Arquivo: %s' + sLineBreak +
