@@ -38,7 +38,9 @@ type
     btn_ImportarProduto: TPanel;
     btn_Produto: TPanel;
     Button1: TButton;
-    Panel1: TPanel;
+    btn_IntegrarPesagem: TPanel;
+    Edit_OP: TEdit;
+    OP: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure btn_ImportarReceberClick(Sender: TObject);
@@ -53,6 +55,7 @@ type
     procedure btn_ProdutoClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure btn_IntegrarPesagemClick(Sender: TObject);
   private
     { Private declarations }
     FBusy: Boolean;
@@ -2370,6 +2373,205 @@ begin
     if FDConnectionSupabase.Connected then
       FDConnectionSupabase.Connected := False;
   except end;
+end;
+
+procedure TForm_Principal.btn_IntegrarPesagemClick(Sender: TObject);
+  function QStr(const S: string): string;
+  begin
+    Result := '''' + StringReplace(S, '''', '''''', [rfReplaceAll]) + '''';
+  end;
+  function NullableStr(const S: string): string;
+  begin
+    if Trim(S) = '' then Result := 'NULL' else Result := QStr(S);
+  end;
+var
+  Ini: TIniFile;
+  DataStr: string;
+  Ano, Mes, Dia: Word;  
+  TotalProc, TotalIncl: Integer;
+  fmtNum: TFormatSettings;
+  sl: TStringList;
+  linha, outDir, outFile: string;
+  first: Boolean;
+  ZFIL, ZSTA, ZTIPO, ZROT, ZPROC, ZPROD, ZDATA, ZLOC, ZLOTE, ZEND, ZOP, ZCC: string;
+  ZYSIC: Int64;
+  ZQTD: Double;
+begin
+  // Conectar TOTVS (SQL Server) e SICFAR (Firebird)
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
+  try
+    if not Assigned(Form_ConfigSqlServer) then
+      Application.CreateForm(TForm_ConfigSqlServer, Form_ConfigSqlServer);
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionTOTVS, 'Protheus');
+    Form_ConfigSqlServer.ConfigureAndConnectFDConnection(Ini, FDConnectionSICFAR, 'SICFAR');
+  finally
+    Ini.Free;
+  end;
+
+  // Consulta no SICFAR
+  qSICFAR.Close;
+  qSICFAR.Connection := FDConnectionSICFAR;
+  qSICFAR.SQL.Clear;
+  qSICFAR.SQL.Add('SELECT');
+  qSICFAR.SQL.Add('  ''01''        ZC3_FILIAL,');
+  qSICFAR.SQL.Add('  ''0''         ZC3_STATUS,');
+  qSICFAR.SQL.Add('  ''CON''       ZC3_TIPO,');
+  qSICFAR.SQL.Add('  p.balanca     ZC3_ROTINA,');
+  qSICFAR.SQL.Add('  ''PESAGEM''   ZC3_PROCES,');
+  qSICFAR.SQL.Add('  p.pesagem_id ZC3_YSIC,');
+  qSICFAR.SQL.Add('  substring(p.insumo FROM 1 FOR 8) ZC3_PROD,');
+  qSICFAR.SQL.Add('  CAST(');
+  qSICFAR.SQL.Add('    EXTRACT(YEAR  FROM p.data_inc) * 10000 +');
+  qSICFAR.SQL.Add('    EXTRACT(MONTH FROM p.data_inc) * 100   +');
+  qSICFAR.SQL.Add('    EXTRACT(DAY   FROM p.data_inc)');
+  qSICFAR.SQL.Add('  AS VARCHAR(8)) AS ZC3_DATA,');
+  qSICFAR.SQL.Add('  ''11''       ZC3_LOCAL,');
+  qSICFAR.SQL.Add('  p.lote_mp  ZC3_LOTE,');
+  qSICFAR.SQL.Add('  p.endereco ZC3_END,');
+  qSICFAR.SQL.Add('  CAST(p.quantidade_pesada / 1000 AS DECIMAL(18,7)) ZC3_QTD,');
+  qSICFAR.SQL.Add('  p.op||''01002'' ZC3_OP,');
+  qSICFAR.SQL.Add('  ''1021605'' ZC3_CC');
+
+  qSICFAR.SQL.Add('FROM tbpesagem p');
+  qSICFAR.SQL.Add('WHERE p.deletado = ''N'' ');
+  qSICFAR.SQL.Add('  AND p.balanca_id IN (5,6,14,15)');
+
+  qSICFAR.SQL.Add('  AND p.status = ''Impressa Aprovada'' ');
+  qSICFAR.SQL.Add('  AND ((p.sync IS NULL) OR (p.sync = ''N''))');
+
+  if Trim(Edit_OP.Text) <> '' then
+    qSICFAR.SQL.Add(' and p.op = ''' + Trim(Edit_OP.Text) + ''' ');
+
+  qSICFAR.SQL.Add('ORDER BY p.op');
+
+//  qSICFAR.ParamByName('pData').DataType := ftDate;
+//  qSICFAR.ParamByName('pData').AsDate := DataFiltro;
+
+  qSICFAR.Open;
+
+  // Formatação numérica com ponto
+  fmtNum := TFormatSettings.Create;
+  fmtNum.DecimalSeparator := '.';
+
+  sl := TStringList.Create;
+  try
+    TotalProc := 0;
+    TotalIncl := 0;
+
+    // Cabeçalho
+    sl.Add('DECLARE @RECNO_BASE BIGINT;');
+    sl.Add('SET @RECNO_BASE = ISNULL((SELECT MAX(R_E_C_N_O_) FROM ZC3010), 0);');
+    sl.Add('');
+    sl.Add(';WITH src AS (');
+    sl.Add('    SELECT * FROM (VALUES');
+
+    first := True;
+
+    qSICFAR.First;
+    while not qSICFAR.Eof do
+    begin
+      Inc(TotalProc);
+
+      ZFIL  := qSICFAR.FieldByName('ZC3_FILIAL').AsString;
+      ZSTA  := qSICFAR.FieldByName('ZC3_STATUS').AsString;
+      ZTIPO := qSICFAR.FieldByName('ZC3_TIPO').AsString;
+      ZROT  := qSICFAR.FieldByName('ZC3_ROTINA').AsString;
+      ZPROC := qSICFAR.FieldByName('ZC3_PROCES').AsString;
+      ZYSIC := qSICFAR.FieldByName('ZC3_YSIC').AsLargeInt;
+      ZPROD := qSICFAR.FieldByName('ZC3_PROD').AsString;
+      ZDATA := qSICFAR.FieldByName('ZC3_DATA').AsString;
+      ZLOC  := qSICFAR.FieldByName('ZC3_LOCAL').AsString;
+      ZLOTE := qSICFAR.FieldByName('ZC3_LOTE').AsString;
+      ZEND  := qSICFAR.FieldByName('ZC3_END').AsString;
+      ZQTD  := qSICFAR.FieldByName('ZC3_QTD').AsFloat;
+      ZOP   := qSICFAR.FieldByName('ZC3_OP').AsString;
+      ZCC   := qSICFAR.FieldByName('ZC3_CC').AsString;
+
+      // Validação na base TOTVS
+      qTOTVS.Close;
+      qTOTVS.Connection := FDConnectionTOTVS;
+      qTOTVS.SQL.Text :=
+        'SELECT TOP 1 D3_OP ' + sLineBreak +
+        'FROM SD3010 SD3 ' + sLineBreak +
+        'WHERE SD3.D_E_L_E_T_ = '''' ' + sLineBreak +
+        '  AND D3_OP = :pOP ' + sLineBreak +
+        '  AND D3_ESTORNO = '''' ' + sLineBreak +
+        '  AND D3_TM = ''510'' ' + sLineBreak +
+        '  AND D3_DOC LIKE ''S-%''';
+      qTOTVS.ParamByName('pOP').AsString := qSICFAR.FieldByName('ZC3_OP').AsString;
+      qTOTVS.Open;
+
+      if qTOTVS.Eof then
+      begin
+        if not first then
+          sl[sl.Count-1] := sl[sl.Count-1] + ',';
+
+        linha :=
+          Format('        (%s,%s,%s,%s,%s,%s,%s,%s, %s,%s,%s,%s,%d,%s)',
+          [
+            QStr(ZFIL),
+            QStr(ZSTA),
+            QStr(ZTIPO),
+            QStr(Trim(ZPROD)),
+            QStr(Trim(ZDATA)),
+            QStr(ZLOC),
+            QStr(Trim(ZLOTE)),
+            NullableStr(Trim(ZEND)),
+            FloatToStrF(ZQTD, ffFixed, 18, 7, fmtNum),
+            QStr(Trim(ZOP)),
+            QStr(Trim(ZROT)),
+            QStr(Trim(ZPROC)),
+            ZYSIC,
+            QStr(Trim(ZCC))
+          ]);
+        sl.Add(linha);
+        first := False;
+        Inc(TotalIncl);
+      end;
+
+      qSICFAR.Next;
+    end;
+
+    sl.Add('    ) AS v(ZC3_FILIAL,ZC3_STATUS,ZC3_TIPO,ZC3_PROD,ZC3_DATA,ZC3_LOCAL,ZC3_LOTE,ZC3_END,ZC3_QTD,ZC3_OP,ZC3_ROTINA,ZC3_PROCES,ZC3_YSIC,ZC3_CC)');
+    sl.Add('),');
+    sl.Add('num AS (');
+    sl.Add('    SELECT ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS rn, *');
+    sl.Add('    FROM src');
+    sl.Add(')');
+    sl.Add('INSERT INTO ZC3010 (');
+    sl.Add('    R_E_C_N_O_, ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
+    sl.Add('    ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
+    sl.Add('    ZC3_QTD, ZC3_END, ZC3_OP,');
+    sl.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
+    sl.Add(')');
+    sl.Add('SELECT');
+    sl.Add('    @RECNO_BASE + rn,');
+    sl.Add('    ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
+    sl.Add('    ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
+    sl.Add('    CAST(ZC3_QTD AS DECIMAL(18,7)),');
+    sl.Add('    ISNULL(ZC3_END, ''''),');
+    sl.Add('    ZC3_OP,');
+    sl.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
+    sl.Add('FROM num;');
+
+    if TotalIncl > 0 then
+    begin
+      ShowMessage(Format('Nenhum registro para inserir. Processados: %d. Incluídos: %d.', [TotalProc, TotalIncl]));
+      Exit;
+    end;
+
+    outDir := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) + 'docs\pesagem\';
+    ForceDirectories(outDir);
+    outFile := outDir + Format('InsertBase_ZC3_%s.sql', [StringReplace(DataStr, '-', '', [rfReplaceAll])]);
+    sl.SaveToFile(outFile, TEncoding.UTF8);
+
+    ShowMessage(Format('SQL gerado com sucesso.' + sLineBreak + 'Arquivo: %s' + sLineBreak +
+      'Processados: %d   Incluídos: %d', [outFile, TotalProc, TotalIncl]));
+  finally
+    sl.Free;
+    try if qSICFAR.Active then qSICFAR.Close; except end;
+    try if qTOTVS.Active then qTOTVS.Close; except end;
+  end;
 end;
 
 procedure TForm_Principal.pImportaClienteSA1(prCodCliente: string);

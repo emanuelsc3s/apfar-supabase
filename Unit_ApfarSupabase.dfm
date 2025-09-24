@@ -2,7 +2,7 @@ object Form_Principal: TForm_Principal
   Left = 0
   Top = 0
   Caption = 'Form_Principal'
-  ClientHeight = 483
+  ClientHeight = 494
   ClientWidth = 872
   Color = clBtnFace
   Font.Charset = ANSI_CHARSET
@@ -17,6 +17,13 @@ object Form_Principal: TForm_Principal
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
+  object OP: TLabel
+    Left = 134
+    Top = 405
+    Width = 16
+    Height = 13
+    Caption = 'OP'
+  end
   object DBGrid1: TDBGrid
     Left = 8
     Top = 8
@@ -229,9 +236,9 @@ object Form_Principal: TForm_Principal
     TabOrder = 11
     OnClick = Button1Click
   end
-  object Panel1: TPanel
-    Left = 155
-    Top = 399
+  object btn_IntegrarPesagem: TPanel
+    Left = 8
+    Top = 415
     Width = 120
     Height = 35
     Cursor = crHandPoint
@@ -246,7 +253,14 @@ object Form_Principal: TForm_Principal
     ParentBackground = False
     ParentFont = False
     TabOrder = 12
-    OnClick = btn_ProdutoClick
+    OnClick = btn_IntegrarPesagemClick
+  end
+  object Edit_OP: TEdit
+    Left = 134
+    Top = 424
+    Width = 121
+    Height = 25
+    TabOrder = 13
   end
   object FDConnectionSupabase: TFDConnection
     Params.Strings = (
