@@ -2378,15 +2378,8 @@ end;
 procedure TForm_Principal.btn_IntegrarPesagemClick(Sender: TObject);
 var
   Ini: TIniFile;
-  SL: TStringList;
-  fs: TFormatSettings;
-  HasAny: Boolean;
-  sFile: string;
-
-  function Q(const S: string): string;
-  begin
-    Result := '''' + StringReplace(S, '''', '''''', [rfReplaceAll]) + '''';
-  end;
+  qIns, qZC3: TFDQuery;
+  vRecno: Int64;
 begin
   // Conectar TOTVS (SQL Server) e SICFAR (Firebird)
   Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'BaseSIC.ini');
@@ -2425,37 +2418,49 @@ begin
 
   qSICFAR.SQL.Add('FROM tbpesagem p');
   qSICFAR.SQL.Add('WHERE p.deletado = ''N'' ');
-  qSICFAR.SQL.Add('  AND p.balanca_id IN (5,6,14,15)');
 
-  qSICFAR.SQL.Add(' and cast(p.data_inc as date) >= ''18.09.2025'' ');
+  qSICFAR.SQL.Add(' AND cast(p.data_inc as date) >= ''18.09.2025'' ');
 
-  qSICFAR.SQL.Add('  AND p.status = ''Impressa Aprovada'' ');
-  qSICFAR.SQL.Add('  AND ((p.sync IS NULL) OR (p.sync = ''N''))');
+  qSICFAR.SQL.Add(' AND p.balanca_id IN (5,6,14,15)');
 
+  qSICFAR.SQL.Add(' AND p.status = ''Impressa Aprovada'' ');
+  qSICFAR.SQL.Add(' AND ((p.sync IS NULL) OR (p.sync = ''N''))');
 
   if Trim(Edit_OP.Text) <> '' then
-    qSICFAR.SQL.Add(' and p.op = ''' + Trim(Edit_OP.Text) + ''' ');
+    qSICFAR.SQL.Add(' and p.op = ''' + Copy(Trim(Edit_OP.Text),1,6) + ''' ');
 
-
-  qSICFAR.SQL.Add('ORDER BY p.op');
+  qSICFAR.SQL.Add(' ORDER BY p.op, p.pesagem_id');
 
   qSICFAR.Open;
 
   if not qSICFAR.IsEmpty then
     begin
       qSICFAR.First;
-      // Preparar StringList e cabeçalho do script SQL (CTE)
-      SL := TStringList.Create;
-      HasAny := False;
-      fs := TFormatSettings.Create;
-      fs.DecimalSeparator := '.';
-      SL.Add('DECLARE @RECNO_BASE BIGINT;');
-      SL.Add('SET @RECNO_BASE = ISNULL((SELECT MAX(R_E_C_N_O_) FROM ZC3010), 0);');
-      SL.Add('');
-      SL.Add(';WITH src AS (');
-      SL.Add('    SELECT * FROM (VALUES');
       while not qSICFAR.Eof do
         begin
+          // Verifica se o registro já existe na ZC3 (TOTVS)
+          qZC3 := TFDQuery.Create(nil);
+          try
+            with qZC3 do
+            begin
+              Close;
+              Connection := FDConnectionTOTVS;
+              SQL.Clear;
+              SQL.Add('SELECT COUNT(*) AS TOTAL FROM ZC3010');
+              SQL.Add('WHERE D_E_L_E_T_ = '''' AND ZC3_YSIC = ' + QuotedStr(qSICFAR.FieldByName('ZC3_YSIC').AsString));
+              Open;
+
+              // Se o registro já existe, pula para o próximo
+              if FieldByName('TOTAL').AsInteger > 0 then
+              begin
+                qSICFAR.Next;
+                Continue; // Sai do loop atual e vai para o próximo registro
+              end;
+            end;
+          finally
+            qZC3.Free;
+          end;
+
           // Validação na base TOTVS, caso não exista registro incluir no SQL de Insert
           with qTOTVS do
             begin
@@ -2463,7 +2468,6 @@ begin
               Connection := FDConnectionTOTVS;
               SQL.Text   := 'SELECT TOP 1 D3_OP ';
               SQL.Add(' FROM SD3010 SD3 ');
-
               SQL.Add(' WHERE SD3.D_E_L_E_T_ = '''' ');
 
               SQL.Add(' AND D3_OP      = :pOP');
@@ -2472,7 +2476,7 @@ begin
 
               SQL.Add(' AND D3_ESTORNO = '''' ');
               SQL.Add(' AND D3_TM = ''510'' ');
-              SQL.Add(' AND D3_DOC LIKE ''S-%'' ');
+//              SQL.Add(' AND D3_DOC LIKE ''S-%'' ');
 
               ParamByName('pOP').AsString      := qSICFAR.FieldByName('ZC3_OP').AsString;
               ParamByName('pProduto').AsString := qSICFAR.FieldByName('ZC3_PROD').AsString;
@@ -2481,83 +2485,60 @@ begin
               Open;
             end;
 
-            if qTOTVS.IsEmpty then // Se vazio, então linha não existe na TOTVS, acumular para script
+            if qTOTVS.IsEmpty then // Se vazio, então linha não existe na TOTVS, pode inserir no SQL de insert
               begin
-                // Montagem da linha VALUES conforme modelo da CTE
-                // Campos string devem ter aspas simples duplicadas
-                // Ordem: ZC3_FILIAL,ZC3_STATUS,ZC3_TIPO,ZC3_PROD,ZC3_DATA,ZC3_LOCAL,ZC3_LOTE,ZC3_END,ZC3_QTD,ZC3_OP,ZC3_ROTINA,ZC3_PROCES,ZC3_YSIC,ZC3_CC
-                var vFilial, vStatus, vTipo, vProd, vData, vLocal, vLote, vEnd,
-                    vQtd, vOP, vRotina, vProces, vYSic, vCC, content: string;
+                // Inserção direta na ZC3010 baseada no modelo (um registro por vez)
+                // Atenção ao R_E_C_N_O_: calcula o próximo recno atual da tabela
+                try
+                  vRecno := FDConnectionTOTVS.ExecSQLScalar('SELECT ISNULL(MAX(R_E_C_N_O_), 0) + 1 FROM ZC3010');
+                except
+                  on E: Exception do
+                    raise Exception.Create('Falha ao obter próximo R_E_C_N_O_ da ZC3010: ' + E.Message);
+                end;
 
-                vFilial := Q(qSICFAR.FieldByName('ZC3_FILIAL').AsString);
-                vStatus := Q(qSICFAR.FieldByName('ZC3_STATUS').AsString);
-                vTipo   := Q(qSICFAR.FieldByName('ZC3_TIPO').AsString);
-                vProd   := Q(qSICFAR.FieldByName('ZC3_PROD').AsString);
-                vData   := Q(qSICFAR.FieldByName('ZC3_DATA').AsString); // 'yyyymmdd'
-                vLocal  := Q(qSICFAR.FieldByName('ZC3_LOCAL').AsString);
-                vLote   := Q(qSICFAR.FieldByName('ZC3_LOTE').AsString);
-                vEnd    := Q(qSICFAR.FieldByName('ZC3_END').AsString);
-                vQtd    := FormatFloat('0.#######', qSICFAR.FieldByName('ZC3_QTD').AsFloat, fs); // decimal com ponto
-                vOP     := Q(qSICFAR.FieldByName('ZC3_OP').AsString);
-                vRotina := Q(qSICFAR.FieldByName('ZC3_ROTINA').AsString);
-                vProces := Q(qSICFAR.FieldByName('ZC3_PROCES').AsString);
-                vYSic   := Trim(qSICFAR.FieldByName('ZC3_YSIC').AsString);
-                if vYSic = '' then vYSic := 'NULL';
-                vCC     := Q(qSICFAR.FieldByName('ZC3_CC').AsString);
+                qIns := TFDQuery.Create(nil);
+                try
+                  qIns.Connection := FDConnectionTOTVS;
+                  qIns.SQL.Clear;
+                  qIns.SQL.Add('INSERT INTO ZC3010 (');
+                  qIns.SQL.Add('  R_E_C_N_O_, ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
+                  qIns.SQL.Add('  ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
+                  qIns.SQL.Add('  ZC3_QTD, ZC3_END, ZC3_OP,');
+                  qIns.SQL.Add('  ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
+                  qIns.SQL.Add(') VALUES (');
+                  qIns.SQL.Add('  :recno, :tipo, :filial, :status,');
+                  qIns.SQL.Add('  :prod, :data, :local, :lote,');
+                  qIns.SQL.Add('  :qtd, :end, :op,');
+                  qIns.SQL.Add('  :rotina, :proces, :ysic, :cc');
+                  qIns.SQL.Add(')');
 
-                content := '(' +
-                           vFilial + ',' + vStatus + ',' + vTipo + ',' + vProd + ',' + vData + ',' + vLocal + ',' +
-                           vLote + ',' + vEnd + ',' + vQtd + ',' + vOP + ',' + vRotina + ',' + vProces + ',' + vYSic + ',' + vCC +
-                           ')';
-                if HasAny then
-                  SL.Add('        ,' + content)
-                else
-                begin
-                  SL.Add('        ' + content);
-                  HasAny := True;
+                  qIns.ParamByName('recno').AsLargeInt := vRecno;
+                  qIns.ParamByName('tipo').AsString    := qSICFAR.FieldByName('ZC3_TIPO').AsString;
+                  qIns.ParamByName('filial').AsString  := qSICFAR.FieldByName('ZC3_FILIAL').AsString;
+                  qIns.ParamByName('status').AsString  := qSICFAR.FieldByName('ZC3_STATUS').AsString;
+
+                  qIns.ParamByName('prod').AsString    := qSICFAR.FieldByName('ZC3_PROD').AsString;
+                  qIns.ParamByName('data').AsString    := qSICFAR.FieldByName('ZC3_DATA').AsString;   // formato yyyymmdd
+                  qIns.ParamByName('local').AsString   := qSICFAR.FieldByName('ZC3_LOCAL').AsString;
+                  qIns.ParamByName('lote').AsString    := qSICFAR.FieldByName('ZC3_LOTE').AsString;
+
+                  qIns.ParamByName('qtd').AsFloat      := qSICFAR.FieldByName('ZC3_QTD').AsFloat;     // DECIMAL(18,7)
+                  qIns.ParamByName('end').AsString     := qSICFAR.FieldByName('ZC3_END').AsString;
+                  qIns.ParamByName('op').AsString      := qSICFAR.FieldByName('ZC3_OP').AsString;
+
+                  qIns.ParamByName('rotina').AsString  := qSICFAR.FieldByName('ZC3_ROTINA').AsString;
+                  qIns.ParamByName('proces').AsString  := qSICFAR.FieldByName('ZC3_PROCES').AsString;
+                  qIns.ParamByName('ysic').AsString    := qSICFAR.FieldByName('ZC3_YSIC').AsString;
+                  qIns.ParamByName('cc').AsString      := qSICFAR.FieldByName('ZC3_CC').AsString;
+
+                  qIns.ExecSQL;
+                finally
+                  qIns.Free;
                 end;
               end;
 
           qSICFAR.Next;
         end;
-
-      // Finalizar CTE e salvar script
-      if HasAny then
-      begin
-        SL.Add('    ) AS v(');
-        SL.Add('        ZC3_FILIAL,ZC3_STATUS,ZC3_TIPO,ZC3_PROD,ZC3_DATA,ZC3_LOCAL,');
-        SL.Add('        ZC3_LOTE,ZC3_END,ZC3_QTD,ZC3_OP,ZC3_ROTINA,ZC3_PROCES,ZC3_YSIC,ZC3_CC');
-        SL.Add('    )');
-        SL.Add('),');
-        SL.Add('num AS (');
-        SL.Add('    SELECT ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS rn, *');
-        SL.Add('    FROM src');
-        SL.Add(')');
-        SL.Add('INSERT INTO ZC3010 (');
-        SL.Add('    R_E_C_N_O_, ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
-        SL.Add('    ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
-        SL.Add('    ZC3_QTD, ZC3_END, ZC3_OP,');
-        SL.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
-        SL.Add(')');
-        SL.Add('SELECT');
-        SL.Add('    @RECNO_BASE + rn,');
-        SL.Add('    ZC3_TIPO, ZC3_FILIAL, ZC3_STATUS,');
-        SL.Add('    ZC3_PROD, ZC3_DATA, ZC3_LOCAL, ZC3_LOTE,');
-        SL.Add('    CAST(ZC3_QTD AS DECIMAL(18,7)),');
-        SL.Add('    ISNULL(ZC3_END, ''''),');
-        SL.Add('    ZC3_OP,');
-        SL.Add('    ZC3_ROTINA, ZC3_PROCES, ZC3_YSIC, ZC3_CC');
-        SL.Add('FROM num;');
-
-        sFile := ExtractFilePath(Application.ExeName) + 'docs\pesagem\InsertZC3_' + FormatDateTime('yyyymmdd_hhnnss', Now) + '.sql';
-        SL.SaveToFile(sFile);
-        ShowMessage('Script gerado com sucesso: ' + sFile);
-      end
-      else
-        ShowMessage('Nenhum registro novo para gerar script.');
-
-      FreeAndNil(SL);
-
     end;
 end;
 
